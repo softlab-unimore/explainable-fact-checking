@@ -15,7 +15,7 @@ then convert it into an html string
 """
 
 
-def style_exp_list(exp):
+def style_exp_to_html(exp):
     """
     html = pred_df.to_html()
     pred_df = pd.DataFrame(zip(exp.class_names, exp.predict_proba), columns=['class_names', 'predict_proba'])

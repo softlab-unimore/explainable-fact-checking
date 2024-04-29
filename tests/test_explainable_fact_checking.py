@@ -35,8 +35,8 @@ def test_shap():
     fc_exp_wrapper = WrapperExplaniableFactChecking(record, predictor)
 
     explainer = shap.Explainer(fc_exp_wrapper, masker=CustomTokenizer)
-    shap_values = explainer(fc_exp_wrapper.get_evidence_string())
-    assert len(shap_values) == len(fc_exp_wrapper.get_evidence_string().split(fc_exp_wrapper.separator))
+    shap_values = explainer(fc_exp_wrapper.get_text_to_perturb())
+    assert len(shap_values) == len(fc_exp_wrapper.get_text_to_perturb().split(fc_exp_wrapper.separator))
 
 
 def test_lime():
@@ -60,7 +60,7 @@ def test_lime():
                      ],
     )
     exp = explainer.explain_instance(
-        text_instance=fc_exp_wrapper.get_evidence_string(),
+        text_instance=fc_exp_wrapper.get_text_to_perturb(),
         classifier_fn=fc_exp_wrapper,
         top_labels=1,
         num_features=fc_exp_wrapper.get_num_evidence(),
