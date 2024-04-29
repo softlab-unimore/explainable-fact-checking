@@ -6,7 +6,6 @@ import pickle
 import numpy as np
 from lime.lime_text import LimeTextExplainer
 
-from feverous_model import run_exp_multitest_wsavedmodel
 from transformers import PreTrainedTokenizer
 
 from explainable_fact_checking.adapters.feverous_model import FeverousModelAdapter
@@ -68,7 +67,7 @@ class WrapperExplaniableFactChecking:
     evidence_separator = r' </s> '
     reference_record = {}
 
-    def __init__(self, record, predict_method, separator=r' </s> ', debug=False):
+    def __init__(self, record, predict_method, separator=r' </s> ', perturbation_mode='only_evidence', debug=False):
         self.record = record
         self.content_index_map = self.get_content_index_map(record)
         self.claim = None
@@ -83,6 +82,14 @@ class WrapperExplaniableFactChecking:
         self.separator = separator
         self.predict_method = predict_method
         self.id = record['id']
+
+        if perturbation_mode == 'only_evidence':
+            self.get_text_to_perturb = self.get_evidence_string
+        elif perturbation_mode == 'claim_and_evidence':
+            # todo adjust with composition wrt the mode of perturbation
+            raise(NotImplementedError('Not implemented yet'))
+
+
         self.debug = debug
         if debug:
             self.debug_data = {}
@@ -104,6 +111,8 @@ class WrapperExplaniableFactChecking:
     def get_evidence_string(self):
         evidence_content = self.get_evidence_list(self.record)
         return self.separator.join(evidence_content)
+
+
 
     def predict_wrapper(self, perturbed_evidence_string_list):
         restructured_records = self.restructure_perturbed_records(perturbed_evidence_string_list)
@@ -180,22 +189,24 @@ class WrapperExplaniableFactChecking:
         record['evidence'][0]['content'] = content
 
 
-def explain_with_lime(file_to_explain, predictor=None, output_dir='/homes/bussotti/feverous_work/feverousdata/AB/', top=None):
+def explain_with_lime(file_to_explain, predictor, output_dir, num_samples, top=None, perturbation_mode='only_evidence'):
     data = []
     early_stop = top is not None
     with open(file_to_explain, 'r') as file:
         for i, line in enumerate(file):
+            if early_stop and i >= top:
+                break
             if line != '\n':
                 data.append(json.loads(line))
-            if early_stop and i == top:
-                break
+
+
 
     if predictor is None:
         fc_model = FeverousModelAdapter()
         predictor = fc_model.predict
 
     for record in data:
-        xfc_wrapper = WrapperExplaniableFactChecking(record, predictor, debug=True)
+        xfc_wrapper = WrapperExplaniableFactChecking(record, predictor, debug=True, perturbation_mode=perturbation_mode)
 
         explainer = LimeTextExplainer(
             split_expression=xfc_wrapper.tokenizer,
@@ -204,16 +215,23 @@ def explain_with_lime(file_to_explain, predictor=None, output_dir='/homes/bussot
             class_names=['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES'],
         )
         labels = range(len(explainer.class_names))
+
         exp = explainer.explain_instance(
-            text_instance=xfc_wrapper.get_evidence_string(),
+            text_instance=xfc_wrapper.get_text_to_perturb(),
             classifier_fn=xfc_wrapper,
             labels=labels,
             num_features=xfc_wrapper.get_num_evidence(),
-            num_samples=50,
+            num_samples=num_samples,
         )
         exp.claim = xfc_wrapper.claim
+        exp.id = xfc_wrapper.get_id()
+        exp.label = record['label']
+        exp.record = record
+        exp.num_samples = num_samples
+
+
         # 1 / (1 + np.exp(-predictions[0]))[:, 2] # NUMPY sigmoid
-        exp_dir = os.path.join(output_dir, 'lime_explanations', file_to_explain.split('/')[-1].split('.')[0])
+        exp_dir = os.path.join(output_dir, file_to_explain.split('/')[-1].split('.')[0])
         # delete the directory if it exists and recrete it
 
         os.makedirs(exp_dir, exist_ok=True)
@@ -236,6 +254,7 @@ def explain_with_lime(file_to_explain, predictor=None, output_dir='/homes/bussot
         exp_dict['intercept'] = exp.intercept
         exp_dict['claim'] = exp.claim
         exp_dict['class_names'] = exp.class_names
+
 
         with open(file_save_path + '.json', 'w') as file:
             json.dump(exp_dict, file)
