@@ -3,6 +3,12 @@ import os
 import time
 
 import numpy as np
+
+import sys
+sys.path.append('/homes/bussotti/feverous_work/feverousdata')
+sys.path.append('/homes/bussotti/feverous_work/feverousdata/feverous')
+
+
 import predictor_universal
 
 

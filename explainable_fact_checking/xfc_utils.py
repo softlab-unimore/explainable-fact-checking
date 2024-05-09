@@ -2,6 +2,8 @@ import numpy as np
 import scipy.stats as st
 
 
+class_names = ['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES']
+
 # st.t.interval(0.95, len(a)-1, loc=np.mean(a), scale=st.sem(a))
 
 def mean_confidence_interval(data, confidence=0.95):

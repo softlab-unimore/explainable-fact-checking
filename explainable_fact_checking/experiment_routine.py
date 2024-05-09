@@ -25,12 +25,15 @@ if __name__ == "__main__":
 
     fc_model = FeverousModelAdapter()
     predictor = fc_model.predict
-    for name in ['ex_AB_00.jsonl',
-                 'feverous_dev_ST_01.jsonl',
-                 'feverous_dev_SO_01.jsonl'
-                 ]:
+    for name in [
+        'original_TO_01.jsonl',
+        # 'ex_AB_00.jsonl',
+        # 'feverous_dev_ST_01.jsonl',
+        # 'feverous_dev_SO_01.jsonl',
+
+    ]:
         input_file_path = os.path.join('/homes/bussotti/feverous_work/feverousdata/AB/', name)
 
         explain_with_lime(input_file_path, predictor=predictor,
-                          output_dir='/homes/bussotti/feverous_work/feverousdata/AB/lime_explanations', num_samples=50,
-                          top=100)
+                          output_dir='/homes/bussotti/feverous_work/feverousdata/AB/lime_explanations', num_samples=500,
+                          top=1000)

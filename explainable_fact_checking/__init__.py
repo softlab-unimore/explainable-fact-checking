@@ -1,9 +1,7 @@
 
 
 from .explanation_presentation import style_exp_to_html, style_single_exp_list
-from .utils import mean_confidence_interval
+from . import xfc_utils
 from .explanations_load import load_explanations_lime_to_df, lime_explanation_to_dict_olap, explanations_to_df_lime, load_explanations_lime
-from .explainable_fact_checking import explain_with_lime
 from .adapters.feverous_model import FeverousModelAdapter
-
-import utils
+from .wrappers import explain_with_lime, AddInputTxtToUse, save_prediciton_without_evidence

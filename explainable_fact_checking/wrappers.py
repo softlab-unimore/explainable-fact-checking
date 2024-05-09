@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import pickle
+from datetime import datetime
 
 import numpy as np
 from lime.lime_text import LimeTextExplainer
@@ -9,7 +10,7 @@ from lime.lime_text import LimeTextExplainer
 from transformers import PreTrainedTokenizer
 
 from explainable_fact_checking.adapters.feverous_model import FeverousModelAdapter
-from explanation_presentation import style_exp_to_html
+from explainable_fact_checking.explanation_presentation import style_exp_to_html
 
 
 class CustomTokenizer(PreTrainedTokenizer):
@@ -211,6 +212,8 @@ def explain_with_lime(file_to_explain, predictor, output_dir, num_samples, top=N
         )
         labels = range(len(explainer.class_names))
 
+        # time the explanation process
+        a = datetime.now()
         exp = explainer.explain_instance(
             text_instance=xfc_wrapper.get_text_to_perturb(),
             classifier_fn=xfc_wrapper,
@@ -218,11 +221,13 @@ def explain_with_lime(file_to_explain, predictor, output_dir, num_samples, top=N
             num_features=xfc_wrapper.get_num_evidence(),
             num_samples=num_samples,
         )
+        b = datetime.now()
         exp.claim = xfc_wrapper.claim
         exp.id = xfc_wrapper.get_id()
         exp.label = record['label']
         exp.record = record
         exp.num_samples = num_samples
+        exp.execution_time = (b - a).total_seconds()
 
 
         # 1 / (1 + np.exp(-predictions[0]))[:, 2] # NUMPY sigmoid
@@ -233,26 +238,31 @@ def explain_with_lime(file_to_explain, predictor, output_dir, num_samples, top=N
 
 
         file_save_path = os.path.join(exp_dir, f'{xfc_wrapper.get_id()}')
-
-        with open(file_save_path + '.html', 'w', encoding='utf-8') as file:
-            file.write(style_exp_to_html(exp))
-        #
-        # with open(file_save_path + '_LIME.html', 'w', encoding='utf8') as file:
-        #     file.write(exp.as_html())
-
         # save explanation in a file using python library pickle
         with open(file_save_path + '.pkl', 'wb') as file:
             pickle.dump(exp, file)
 
+        # read the explanation from the file debug script
+        # with open(file_save_path + '.pkl', 'rb') as file:
+        #     exp = pickle.load(file)
+
+        # with open(file_save_path + '.html', 'w', encoding='utf-8') as file:
+        #     file.write(style_exp_to_html(exp))
+        #
+        # with open(file_save_path + '_LIME.html', 'w', encoding='utf8') as file:
+        #     file.write(exp.as_html())
+
+
+
         # save explanation in a file using python library json
-        exp_dict = {int(label): exp.as_list(label) for label in labels}
-        exp_dict['intercept'] = exp.intercept
-        exp_dict['claim'] = exp.claim
-        exp_dict['class_names'] = exp.class_names
+        # exp_dict = {int(label): exp.as_list(label) for label in labels}
+        # exp_dict['intercept'] = exp.intercept
+        # exp_dict['claim'] = exp.claim
+        # exp_dict['class_names'] = exp.class_names
 
 
-        with open(file_save_path + '.json', 'w') as file:
-            json.dump(exp_dict, file)
+        # with open(file_save_path + '.json', 'w') as file:
+        #     json.dump(exp_dict, file)
 
 
 # class to read jsonl files and predict the labels with the feverous model then takes the value of 'input_txt_to_use' for each prediction and add it to the record and save the new file
@@ -274,10 +284,14 @@ def save_prediciton_without_evidence(input_file, output_file, model):
         record_list = [json.loads(line) for line in f_in]
         for record in record_list:
             record['evidence'] = []
+            # delete the input_txt_to_use field if present
+            if 'input_txt_to_use' in record:
+                del record['input_txt_to_use']
         predictions = model.predict(record_list)
         full_predictions = model.predictions
         for record, pred in zip(record_list, full_predictions):
             record['input_txt_to_use'] = pred['input_txt_model']
             record['claim'] = pred['claim']
-            record['evidence'] = []
-            f_out.write(json.dumps(record) + '\n')
+            t = 'predicted_scores'
+            record[t] = pred[t]
+        json.dump(record_list, f_out)
