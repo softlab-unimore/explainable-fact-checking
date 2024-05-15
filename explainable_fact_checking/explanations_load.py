@@ -67,6 +67,8 @@ def lime_explanation_to_dict_olap(exp):
     out_dict['local_pred'] = exp.local_pred[0]
     if 'label' not in out_dict and hasattr(exp, 'record'):
         out_dict['label'] = exp.record['label']
+    if not hasattr(exp, 'class_names'):
+        exp.class_names = xfc.xfc_utils.class_names
     # save predict_proba of each class
     for i, tclass in enumerate(exp.class_names):
         out_dict[tclass + '_predict_proba'] = exp.predict_proba[i]

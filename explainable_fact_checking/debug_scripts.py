@@ -1,6 +1,13 @@
 import jsonlines
 
+
+
 [l for l in jsonlines.open(data_path + "/" + dev_test, "r")]
+
+# Get length of the list of dictionaries
+# [len(x['input_txt_to_use'].split('</s>'))-1 for x in restructured_records]
+
+
 
 {"evidence": [{"content": ["Algebraic logic_sentence_0", "Lindenbaum\u2013Tarski algebra_sentence_1",
                            "Lindenbaum\u2013Tarski algebra_sentence_6", "Lindenbaum\u2013Tarski algebra_sentence_3",

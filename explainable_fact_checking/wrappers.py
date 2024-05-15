@@ -1,16 +1,20 @@
 import copy
 import json
+import logging
 import os
 import pickle
+import sys
+import traceback
 from datetime import datetime
 
 import numpy as np
+import shap
 from lime.lime_text import LimeTextExplainer
 
 from transformers import PreTrainedTokenizer
 
 from explainable_fact_checking.adapters.feverous_model import FeverousModelAdapter
-from explainable_fact_checking.explanation_presentation import style_exp_to_html
+import explainable_fact_checking as xfc
 
 
 class CustomTokenizer(PreTrainedTokenizer):
@@ -68,9 +72,11 @@ class WrapperExplaniableFactChecking:
     evidence_separator = r' </s> '
     reference_record = {}
 
-    def __init__(self, record, predict_method, separator=r' </s> ', perturbation_mode='only_evidence', debug=False):
+    def __init__(self, record, predict_method, separator=r' </s> ', perturbation_mode='only_evidence', explainer='lime',
+                 debug=False):
         self.record = record
-        self.content_index_map = self.get_content_index_map(record)
+        self.evidence_index_map = self.get_evidence_index_map(record)
+        self.evidence_array = np.array(self.get_evidence_list(record))
         self.claim = None
         self.mode = 'normal'
         self.restructure_perturbed_records = self.restructure_perturbed_records_codes
@@ -79,17 +85,25 @@ class WrapperExplaniableFactChecking:
                 0], 'Claim and input_txt_to_use do not match'
             self.claim = record['claim']
             self.mode = 'input_txt_to_use'
-            self.restructure_perturbed_records = self.restructure_perturbed_records_strings
+
+            if explainer == 'shap':
+                self.restructure_perturbed_records = self.restructure_perturbed_records_onehot
+            elif explainer == 'lime':
+                self.restructure_perturbed_records = self.restructure_perturbed_records_strings
+            else:
+                raise ValueError('Explainer not recognized')
+        else:
+            assert 'claim' in record, 'Claim not found in record'
         self.separator = separator
         self.predict_method = predict_method
         self.id = record['id']
+        self.explainer = explainer
 
         if perturbation_mode == 'only_evidence':
             self.get_text_to_perturb = self.get_evidence_string
         elif perturbation_mode == 'claim_and_evidence':
             # todo adjust with composition wrt the mode of perturbation
-            raise(NotImplementedError('Not implemented yet'))
-
+            raise (NotImplementedError('Not implemented yet'))
 
         self.debug = debug
         if debug:
@@ -102,7 +116,7 @@ class WrapperExplaniableFactChecking:
         return len(self.get_evidence_list(self.record))
 
     @staticmethod
-    def get_content_index_map(record):
+    def get_evidence_index_map(record):
         evidence_content = WrapperExplaniableFactChecking.get_evidence_list(record)
         content_index_map = {}
         for i, ev in enumerate(evidence_content):
@@ -113,7 +127,9 @@ class WrapperExplaniableFactChecking:
         evidence_content = self.get_evidence_list(self.record)
         return self.separator.join(evidence_content)
 
-
+    def get_evidence_list_SHAP(self):
+        evidence_list = self.get_evidence_list(self.record)
+        return np.array(evidence_list).reshape(1, -1)
 
     def predict_wrapper(self, perturbed_evidence_string_list):
         restructured_records = self.restructure_perturbed_records(perturbed_evidence_string_list)
@@ -133,6 +149,9 @@ class WrapperExplaniableFactChecking:
     def tokenizer(self, text):
         return text.split(self.separator)
 
+    def masker(self, *args):
+        return np.ones((1, len(args)))
+
     def restructure_perturbed_records(self, perturbed_evidence_string_list):
         pass
 
@@ -150,6 +169,14 @@ class WrapperExplaniableFactChecking:
             evidence_list = [ev for ev in evidence_list if ev != 'UNKWORDZ']
             turn_record['id'] = i
             turn_record['input_txt_to_use'] = self.separator.join([self.claim] + evidence_list)
+        return perturbed_record_list
+
+    def restructure_perturbed_records_onehot(self, onehot_evidence_list):
+        perturbed_record_list = [copy.deepcopy(self.record) for _ in range(len(onehot_evidence_list))]
+        for i, (ev, turn_record) in enumerate(zip(onehot_evidence_list, perturbed_record_list)):
+            evidence_list = self.evidence_array[ev == 1]
+            turn_record['id'] = i
+            turn_record['input_txt_to_use'] = self.separator.join([self.claim] + evidence_list.tolist())
         return perturbed_record_list
 
     def restructure_perturbed_records_codes(self, perturbed_evidence_string_list):
@@ -176,9 +203,8 @@ class WrapperExplaniableFactChecking:
             evidence_list = all_el[1:]
             claim = all_el[0]
             return [ev.strip() for ev in evidence_list]
-        return record['evidence'][0]['content']
-
-
+        else:
+            return record['evidence'][0]['content']
 
     @staticmethod
     def set_evidence_content(record, content):
@@ -195,11 +221,13 @@ def explain_with_lime(file_to_explain, predictor, output_dir, num_samples, top=N
             if line != '\n':
                 data.append(json.loads(line))
 
-
-
     if predictor is None:
         fc_model = FeverousModelAdapter()
         predictor = fc_model.predict
+    exp_dir = os.path.join(output_dir, file_to_explain.split('/')[-1].split('.')[0])
+    os.makedirs(exp_dir, exist_ok=True)
+
+    logger = xfc.xfc_utils.get_logget(exp_dir)
 
     for record in data:
         xfc_wrapper = WrapperExplaniableFactChecking(record, predictor, debug=True, perturbation_mode=perturbation_mode)
@@ -225,17 +253,12 @@ def explain_with_lime(file_to_explain, predictor, output_dir, num_samples, top=N
         exp.claim = xfc_wrapper.claim
         exp.id = xfc_wrapper.get_id()
         exp.label = record['label']
+
         exp.record = record
         exp.num_samples = num_samples
         exp.execution_time = (b - a).total_seconds()
 
-
         # 1 / (1 + np.exp(-predictions[0]))[:, 2] # NUMPY sigmoid
-        exp_dir = os.path.join(output_dir, file_to_explain.split('/')[-1].split('.')[0])
-        # delete the directory if it exists and recrete it
-
-        os.makedirs(exp_dir, exist_ok=True)
-
 
         file_save_path = os.path.join(exp_dir, f'{xfc_wrapper.get_id()}')
         # save explanation in a file using python library pickle
@@ -252,46 +275,65 @@ def explain_with_lime(file_to_explain, predictor, output_dir, num_samples, top=N
         # with open(file_save_path + '_LIME.html', 'w', encoding='utf8') as file:
         #     file.write(exp.as_html())
 
-
-
         # save explanation in a file using python library json
         # exp_dict = {int(label): exp.as_list(label) for label in labels}
         # exp_dict['intercept'] = exp.intercept
         # exp_dict['claim'] = exp.claim
         # exp_dict['class_names'] = exp.class_names
 
-
         # with open(file_save_path + '.json', 'w') as file:
         #     json.dump(exp_dict, file)
 
 
-# class to read jsonl files and predict the labels with the feverous model then takes the value of 'input_txt_to_use' for each prediction and add it to the record and save the new file
-class AddInputTxtToUse:
-    @staticmethod
-    def predict_and_save(input_file, output_file, model):
-        with open(input_file, 'r') as f_in, open(output_file, 'w') as f_out:
-            record_list = [json.loads(line) for line in f_in]
-            predictions = model.predict(record_list)
-            full_predictions = model.predictions
-            for record, pred in zip(record_list, full_predictions):
-                record['input_txt_to_use'] = pred['input_txt_model']
-                record['claim'] = pred['claim']
+def explain_with_SHAP(file_to_explain, predictor, output_dir, num_samples, top=None, perturbation_mode='only_evidence'):
+    data = []
+    early_stop = top is not None
+    with open(file_to_explain, 'r') as file:
+        for i, line in enumerate(file):
+            if early_stop and i >= top:
+                break
+            if line != '\n':
+                data.append(json.loads(line))
 
-                f_out.write(json.dumps(record) + '\n')
+    if predictor is None:
+        fc_model = FeverousModelAdapter()
+        predictor = fc_model.predict
 
-def save_prediciton_without_evidence(input_file, output_file, model):
-    with open(input_file, 'r') as f_in, open(output_file, 'w') as f_out:
-        record_list = [json.loads(line) for line in f_in]
-        for record in record_list:
-            record['evidence'] = []
-            # delete the input_txt_to_use field if present
-            if 'input_txt_to_use' in record:
-                del record['input_txt_to_use']
-        predictions = model.predict(record_list)
-        full_predictions = model.predictions
-        for record, pred in zip(record_list, full_predictions):
-            record['input_txt_to_use'] = pred['input_txt_model']
-            record['claim'] = pred['claim']
-            t = 'predicted_scores'
-            record[t] = pred[t]
-        json.dump(record_list, f_out)
+    for record in data:
+        t = record.copy()
+        del t['input_txt_to_use']
+        predictor([t])
+        xfc_wrapper = WrapperExplaniableFactChecking(record, predictor, debug=True, perturbation_mode=perturbation_mode,
+                                                     explainer='shap')
+        evidence_array = xfc_wrapper.get_evidence_list_SHAP()
+        explainer = shap.KernelExplainer(model=xfc_wrapper, data=np.ones((1, evidence_array.shape[1])))
+
+        # time the explanation process
+        a = datetime.now()
+        exp = explainer.shap_values(
+            np.zeros(evidence_array.shape),
+            nsamples=num_samples if num_samples is not None else "auto",
+        )
+        b = datetime.now()
+        exp_dict = dict(
+            local_exp=exp[0].T, # todo convert to same format of local_exp of LIME
+            claim=xfc_wrapper.claim,
+            id=xfc_wrapper.get_id(),
+            label=record['label'],
+            record=record,
+            num_samples=num_samples,
+            execution_time=(b - a).total_seconds(),
+            filename=file_to_explain,
+            predict_proba=xfc_wrapper.predict_wrapper(np.ones(evidence_array.shape)),
+        )
+
+        # 1 / (1 + np.exp(-predictions[0]))[:, 2] # NUMPY sigmoid
+        exp_dir = os.path.join(output_dir, file_to_explain.split('/')[-1].split('.')[0])
+        # delete the directory if it exists and recrete it
+
+        os.makedirs(exp_dir, exist_ok=True)
+
+        file_save_path = os.path.join(exp_dir, f'{xfc_wrapper.get_id()}')
+        # save explanation in a file using python library pickle
+        with open(file_save_path + '.pkl', 'wb') as file:
+            pickle.dump(exp, file)
