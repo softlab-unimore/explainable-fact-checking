@@ -5,9 +5,9 @@ import time
 import numpy as np
 
 import sys
+
 sys.path.append('/homes/bussotti/feverous_work/feverousdata')
 sys.path.append('/homes/bussotti/feverous_work/feverousdata/feverous')
-
 
 import predictor_universal
 
@@ -91,7 +91,6 @@ def run_exp_multitest_wsavedmodel(dest_folder, train_db, train_dev_file, dev_db,
 
         end = time.time()
 
-
     print("Prediction finished.")
 
 
@@ -109,12 +108,21 @@ class FeverousModelAdapter:
 
     """
 
-    def __init__(self):
+    def __init__(self, pathModel='models_fromjf270623or', random_state=None):
         self.base_path = '/homes/bussotti/feverous_work/feverousdata/'
         self.tmp_file = 'AB/tmp/tmp_records.jsonl'
         self.tmp_pred_file = 'AB/tmp/tmp_predictions'
+        self.pathModel = pathModel
+        self.set_random_state(random_state)
 
-    def predict(self, records):
+    def set_random_state(self, random_seed):
+        self.random_seed = random_seed
+        if random_seed is not None:
+            np.random.seed(random_seed)
+
+    def predict(self, records, random_seed=None):
+        if random_seed is not None:
+            np.random.seed(random_seed)
         records = [records[0]] + records
 
         with open(self.base_path + self.tmp_file, 'w') as file:
@@ -126,7 +134,8 @@ class FeverousModelAdapter:
         res = run_exp_multitest_wsavedmodel([self.tmp_pred_file], 'jf_home/feverous_wikiv1.db',
                                             'feverous_dev_challenges_sentencesandtable.jsonl',
                                             ['jf_home/feverous_wikiv1.db'],
-                                            [self.tmp_file], '', None, None, True, True, 'models_fromjf270623or')
+                                            [self.tmp_file], '', None, None, True, True,
+                                            pathModel=self.pathModel)
 
         # Prediciton format example
         # {   "claim": "Paul Dicks (born in 1950) was a Speaker of the Newfoundland and Labrador House of Assembly, preceding Thomas Lush and succeeded by Lloyd Snow.",

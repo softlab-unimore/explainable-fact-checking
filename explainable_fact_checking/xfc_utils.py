@@ -127,12 +127,15 @@ def map_evidence_types(records):
         evidence_types = []
         for evidence_dict in record['evidence']:
             for evidence in evidence_dict['content']:
-                if '_cell_' in evidence:
-                    evidence_types.append('cell')
-                elif '_sentence_' in evidence:
+                if '_sentence_' in evidence:
                     evidence_types.append('sentence')
+                # elif '_cell_' in evidence:
+                #     evidence_types.append('cell')
                 else:
-                    raise ValueError('Evidence type not recognized.')
+                    pass
+                    # evidence_types.append('cell')
+                    # raise ValueError('Evidence type not recognized.')
+
 
         # assert len(np.nunique(evidence_types)) == len(record['evidence']), f'Number of unique evidence types {np.nunique(evidence_types)} different from number of evidence dictionary {len(record["evidence"])}'
         if 'input_txt_to_use' in record:
@@ -143,11 +146,11 @@ def map_evidence_types(records):
     return out_dict
 
 
-def get_logget(exp_dir: str) -> logging.Logger:
+def init_logger(save_dir: str) -> logging.Logger:
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     c_handler = logging.StreamHandler()
-    f_handler = logging.FileHandler(os.path.join(exp_dir, 'run.log'))
+    f_handler = logging.FileHandler(os.path.join(save_dir, 'run.log'))
     c_handler.setLevel(logging.INFO)
     f_handler.setLevel(logging.INFO)
     c_format = logging.Formatter(fmt='%(asctime)s %(levelname)s:%(name)s: %(message)s',
@@ -173,3 +176,18 @@ def get_logget(exp_dir: str) -> logging.Logger:
     sys.excepthook = handle_exception
 
     return logger
+
+
+
+class GeneralFactory:
+    def __init__(self):
+        self._creators = {}
+
+    def register_creator(self, name, creator):
+        self._creators[name] = creator
+
+    def create(self, name, **kwargs):
+        if name not in self._creators:
+            raise ValueError(f'The name specified ({name}) is not registered. Valid options are {self._creators.keys()}')
+        creator = self._creators[name]
+        return creator(**kwargs)

@@ -1,5 +1,8 @@
 import jsonlines
 
+# t = record.copy()
+# del t['input_txt_to_use']
+# predictor([t])
 
 
 [l for l in jsonlines.open(data_path + "/" + dev_test, "r")]
