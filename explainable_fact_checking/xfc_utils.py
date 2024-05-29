@@ -61,18 +61,19 @@ class AddInputTxtToUse:
         -------
         None
         """
-        with open(input_file, 'r') as f_in, open(output_file, 'w') as f_out:
+        with open(input_file, 'r') as f_in:
             record_list = [json.loads(line) for line in f_in]
-            predictions = model.predict(record_list)
+            predictions = model.predict_legacy(record_list)
             full_predictions = model.predictions
-            for record, pred in zip(record_list, full_predictions):
-                record['input_txt_to_use'] = pred['input_txt_model']
-                record['claim'] = pred['claim']
-
+            for i, pred in enumerate(full_predictions):
+                record_list[i]['input_txt_to_use'] = pred['input_txt_model']
+                record_list[i]['claim'] = pred['claim']
+        with open(output_file, 'w') as f_out:
+            for record in record_list:
                 f_out.write(json.dumps(record) + '\n')
 
 
-def save_prediciton_without_evidence(input_file, output_file, model):
+def save_prediciton_only_claim(input_file, output_file, model):
     """
     Predicts the labels for the records without the evidence field from the input file using the provided model and saves the results in the output file.
 
@@ -148,9 +149,12 @@ def map_evidence_types(records):
 
 def init_logger(save_dir: str) -> logging.Logger:
     logger = logging.getLogger(__name__)
+    # reset the logger
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
     logger.setLevel(logging.INFO)
     c_handler = logging.StreamHandler()
-    f_handler = logging.FileHandler(os.path.join(save_dir, 'run.log'))
+    f_handler = logging.FileHandler(os.path.join(save_dir, 'run.log'), mode='w')
     c_handler.setLevel(logging.INFO)
     f_handler.setLevel(logging.INFO)
     c_format = logging.Formatter(fmt='%(asctime)s %(levelname)s:%(name)s: %(message)s',
