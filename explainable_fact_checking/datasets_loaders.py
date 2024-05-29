@@ -2,12 +2,25 @@ import json
 import os
 
 import explainable_fact_checking.xfc_utils
+from explainable_fact_checking import FeverousModelAdapter
 
 
 def feverous_loader(dataset_dir, dataset_file, top=None, **kwargs):
     data = []
+    input_file = os.path.join(dataset_dir, dataset_file)
+    with open(input_file, 'r') as file:
+        for i, line in enumerate(file):
+            if line != '\n':
+                row = json.loads(line)
+                # if it has the input txt to use field break. If it is not present, add it with
+                if 'input_txt_to_use' not in row:
+                    fc_model = FeverousModelAdapter()
+                    explainable_fact_checking.xfc_utils.AddInputTxtToUse.predict_and_save(input_file=input_file,
+                                                                                    output_file=input_file, model=fc_model)
+                break
+
     early_stop = top is not None
-    with open(os.path.join(dataset_dir, dataset_file), 'r') as file:
+    with open(input_file, 'r') as file:
         if early_stop:
             for i, line in enumerate(file):
                 if i >= top:
