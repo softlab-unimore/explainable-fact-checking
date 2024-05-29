@@ -10,7 +10,7 @@ import explainable_fact_checking as xfc
 def load_explanations_lime(dir='/homes/bussotti/feverous_work/feverousdata/AB/lime_explanations'):
     """
         Using pickle load the explanations by scanning directories in 'lime_explanations' folder
-        For each folder create a dictionary where the key is the filename and the value is a dictonary of explanations
+        For each folder create a dictionary where the key is the dataset_file_name and the value is a dictonary of explanations
         The inner dictionary has as key the name of the file and as value the explanation object.
         use scandir
     """
@@ -31,25 +31,61 @@ def load_explanations_lime(dir='/homes/bussotti/feverous_work/feverousdata/AB/li
 def explanations_to_df_lime(explanations_files):
     """
     Create a pandas dataframe from the explanations
-    input: explanations dictionary that has as key the filename and as value a dictionary of explanations
+    input: explanations dictionary that has as key the dataset_file_name and as value a dictionary of explanations
         the second level dictionary has as key the id of the record and as value the explanation object.
     output: a pandas dataframe with the columns:
         each row represent a unit of the explanation, the columns are:
         position, text, impact, [RECORD_INFO], [EXPLANATION_INFO]
     """
     out_list = []
-    for filename, explanation_dict in explanations_files.items():
+    for dataset_file_name, explanation_dict in explanations_files.items():
         for explanation_key, explanation in explanation_dict.items():
             tdict = {}
-            tdict['filename'] = filename
-            tdict['id'] = explanation_key.replace('.pkl', '')
             texp_list = lime_explanation_to_dict_olap(explanation)
 
             out_list += [tdict | x for x in texp_list]
     ret_df = pd.DataFrame(out_list)
     # sort columns
     # first ['unit_text', 'unit_index',  'SUPPORTS', 'REFUTES', 'NOT ENOUGH INFO',] then the rest
-    columns = ['id', 'type', 'unit_text', 'unit_index', 'SUPPORTS', 'REFUTES', 'NOT ENOUGH INFO', 'filename']
+    columns = ['id', 'type', 'unit_text', 'unit_index', 'SUPPORTS', 'REFUTES', 'NOT ENOUGH INFO', 'dataset_file_name']
+    columns += [x for x in ret_df.columns if x not in columns]
+    ret_df = ret_df[columns]
+    return ret_df.apply(pd.to_numeric, errors='ignore')
+
+
+def explanations_to_df(explanations_list: list):
+    """
+    Create a pandas dataframe from the explanations
+    input: explanations list, where each element is a pair of (params_dict, explanation_list)
+    e.g. of pair: ({'experiment_id': 'sk_f_jf_1.0', 'dataset_name': 'feverous', 'random_seed': 1, 'model_name': 'default',
+    'model_params': {'model_path': 'model_path'},
+     'explainer_name': 'lime', 'dataset_params': {'dataset_dir': 'dataset_dir',
+            'dataset_file_name': 'dataset_name.jsonl', 'top': 1000},
+            'explainer_params': {'perturbation_mode': 'only_evidence', 'num_samples': 500}},
+            [exp1, exp2, ...])
+    output: a pandas dataframe with the columns:
+        each row represent a unit of the explanation, and all values of the params_dict and the explanation_list are added as columns.
+
+    """
+    out_list = []
+    for params_dict, explanation_list in explanations_list:
+        for explanation in explanation_list:
+            # tdict = params_dict.copy()
+            # the params dict has sub dictionaries, we need to flatten it
+            tdict = {}
+            for key, value in params_dict.items():
+                if isinstance(value, dict):
+                    for subkey, subvalue in value.items():
+                        tdict[subkey] = subvalue
+                else:
+                    tdict[key] = value
+            tdict['dataset_file_name'] = tdict.pop('dataset_file')
+            texp_list = lime_explanation_to_dict_olap(explanation)
+            out_list += [tdict | x for x in texp_list]
+    ret_df = pd.DataFrame(out_list)
+    # sort columns
+    # first ['unit_text', 'unit_index',  'SUPPORTS', 'REFUTES', 'NOT ENOUGH INFO',] then the rest
+    columns = ['unit_text', 'unit_index', 'SUPPORTS', 'REFUTES', 'NOT ENOUGH INFO']
     columns += [x for x in ret_df.columns if x not in columns]
     ret_df = ret_df[columns]
     return ret_df.apply(pd.to_numeric, errors='ignore')
@@ -59,41 +95,51 @@ def lime_explanation_to_dict_olap(exp):
     """
     Create a dictionary from a lime explanation object
     """
+    get_method = lambda x: getattr(exp, x) if hasattr(exp, x) else (exp[x] if x in exp else None)
     ret_list = []
     out_dict = {}
-    for key in ['num_samples', 'label', 'execution_time']:
-        if hasattr(exp, key):
-            out_dict[key] = getattr(exp, key)
-    out_dict['local_pred'] = exp.local_pred[0]
-    if 'label' not in out_dict and hasattr(exp, 'record'):
-        out_dict['label'] = exp.record['label']
-    if not hasattr(exp, 'class_names'):
-        exp.class_names = xfc.xfc_utils.class_names
+    for key in ['num_samples', 'label', 'execution_time','id']:
+        out_dict[key] = get_method(key)
+    # out_dict['local_pred'] = exp.local_pred[0]
+    if 'label' not in out_dict and get_method('record') is not None:
+        out_dict['label'] = get_method('record')['label']
+    class_names = get_method('class_names')
+    class_names = xfc.xfc_utils.class_names if class_names is None else class_names
     # save predict_proba of each class
-    for i, tclass in enumerate(exp.class_names):
-        out_dict[tclass + '_predict_proba'] = exp.predict_proba[i]
+    for i, tclass in enumerate(class_names):
+        out_dict[tclass + '_predict_proba'] = get_method('predict_proba')[i]
 
     # create a dictionary exp_by_unit which has as key the index of unit explained and as value a dictionary with the impacts on each class
-    exp_by_unit = {i: {} for i in range(len(exp.local_exp[0]))}
-    for i, tclass in enumerate(exp.class_names):
-        tclass_exp = exp.local_exp[i]
+    local_exp = get_method('local_exp')
+    exp_by_unit = {i: {} for i in range(len(local_exp[0]))}
+    for i, tclass in enumerate(class_names):
+        tclass_exp = local_exp[i]
         for unit_index, impact in tclass_exp:
             exp_by_unit[unit_index][tclass] = impact
 
     # for each element of the explanation create a dictionary with its impacts on each class
+    domain_mapper = get_method('domain_mapper')
     for unit_index, impact_dict in exp_by_unit.items():
         tdict = impact_dict | out_dict
         tdict['unit_index'] = unit_index
-        tdict['unit_text'] = exp.domain_mapper.indexed_string.inverse_vocab[unit_index]
+        tdict['unit_text'] = domain_mapper.indexed_string.inverse_vocab[unit_index]
         tdict['type'] = 'evidence'
         ret_list.append(tdict)
 
+    # Adding the noisetag if available for noisy evidence
+    noisetag = get_method('record')['noisetag']
+    if noisetag is not None:
+        for i in range(len(ret_list)):
+            ret_list[i]['noisetag'] = noisetag[i]
+
     # Adding the claim in unit_text and intercept in the impact
-    claim_text = exp.claim if hasattr(exp, 'claim') else 'No claim available'
+    claim_text = get_method('claim')
+    claim_text = 'No claim available' if claim_text is None else claim_text
     claim_dict = dict(unit_index=0, unit_text=claim_text, type='claim_intercept')
     claim_dict = claim_dict | out_dict
-    for i, tclass in enumerate(exp.class_names):
-        claim_dict[tclass] = exp.intercept[i]
+    intercept = get_method('intercept')
+    for i, tclass in enumerate(class_names):
+        claim_dict[tclass] = intercept[i]
     ret_list.append(claim_dict)
     return ret_list
 
@@ -108,9 +154,18 @@ def load_explanations_lime_to_df(dir='/homes/bussotti/feverous_work/feverousdata
 
 def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/AB/'):
     """
-    Load predictions of only the claim
-    :param dir:
-    :return:
+    Load the predictions of the only_claim model and create a pandas dataframe
+
+    Parameters
+    ----------
+    dir : str
+        The directory where the predictions are stored
+
+    Returns
+    -------
+    pd.DataFrame
+        A pandas dataframe with the predictions of the only_claim model
+
     """
     files = [x for x in os.listdir(dir) if x.endswith('only_claim.json')]
     # load the files
@@ -120,8 +175,8 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
             predictions_dict[file] = json.load(f)
     # convert the file in dataframe
     out_list = []
-    for filename, predictions in predictions_dict.items():
-        base_dict = {'filename': filename.replace('_pred_only_claim.json', '')}
+    for dataset_file_name, predictions in predictions_dict.items():
+        base_dict = {'dataset_file_name': dataset_file_name.replace('_pred_only_claim.json', '')}
         for record in predictions:
             t2dict = base_dict.copy()
             t2dict['unit_index'] = 0
@@ -137,24 +192,29 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
 
 
 def load_preprocess_explanations():
-    files_dict = load_explanations_lime(dir='/homes/bussotti/feverous_work/feverousdata/AB/lime_explanations')
-    id_cols = ['filename', 'id']
-    explanation_df = explanations_to_df_lime(files_dict)
+    x = load_experiment_result_by_code('sk_f_jf_1.1n', xfc.experiment_definitions.C.RESULTS_DIR)
+    explanation_df = explanations_to_df(x)
+
+    # files_dict = load_explanations_lime(dir='/home/bussotti/XFCresults/lime_explanations')
+    # explanation_df = explanations_to_df_lime(files_dict)
+
+    id_cols = ['dataset_file_name', 'id']
+
     index_exp = explanation_df[id_cols]
-
-    only_claim_predictions_df = load_only_claim_predictions()
-    only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
-    common_index = pd.MultiIndex.from_frame(index_exp).intersection(
-        only_claim_predictions_df.index)
-    only_claim_predictions_df = only_claim_predictions_df.loc[common_index].reset_index()
-
     class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names]
 
-    mask = explanation_df['type'] == 'claim_intercept'
-    only_claim_predictions_df = only_claim_predictions_df.merge(explanation_df.loc[mask, id_cols + class_pred_cols])
+    # only_claim_predictions_df = load_only_claim_predictions()
+    # only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
+    # common_index = pd.MultiIndex.from_frame(index_exp).intersection(
+    #     only_claim_predictions_df.index)
+    # only_claim_predictions_df = only_claim_predictions_df.loc[common_index].reset_index()
+    # mask = explanation_df['type'] == 'claim_intercept'
+    # only_claim_predictions_df = only_claim_predictions_df.merge(explanation_df.loc[mask, id_cols + class_pred_cols])
+    #
+    # all_df = pd.concat([explanation_df, only_claim_predictions_df], ignore_index=True)
 
-    all_df = pd.concat([explanation_df, only_claim_predictions_df], ignore_index=True)
-    # sort all_df by filename and id
+    all_df = explanation_df
+    # sort all_df by dataset_file_name and id
     all_df.sort_values(by=id_cols, inplace=True)
 
     all_df['predicted_label'] = all_df[class_pred_cols].idxmax(axis=1).str.replace('_predict_proba', '')
@@ -162,20 +222,45 @@ def load_preprocess_explanations():
         tmask = all_df['predicted_label'] == tclass
         all_df.loc[tmask, 'score_on_predicted_label'] = all_df.loc[tmask, tclass]
 
-
     # save the explanations to a csv file
-    all_df.to_csv('/homes/bussotti/feverous_work/feverousdata/AB/explanations_lime.csv', index=False)
+    all_df.to_csv(os.path.join(xfc.experiment_definitions.C.RESULTS_DIR, 'all_exp.csv'), index=False)
 
-    assert (pd.Series(only_claim_predictions_df[id_cols].astype(str).apply('_'.join, 1).unique()).isin(explanation_df[
-        id_cols].astype(str).apply('_'.join, 1).unique())).all(), \
-        'Different (id, filename) in explanations and only_claim_predictions'
-    assert explanation_df[class_pred_cols].astype(str).apply('_'.join, 1).groupby(
-        explanation_df[id_cols].astype(str).apply('_'.join, 1)).nunique().max() == 1, \
-        'Multiple predict_proba for the same (id, filename)'
+    # assert (pd.Series(only_claim_predictions_df[id_cols].astype(str).apply('_'.join, 1).unique()).isin(explanation_df[
+    #                                                                                                        id_cols].astype(
+    #     str).apply('_'.join, 1).unique())).all(), \
+    #     'Different (id, dataset_file_name) in explanations and only_claim_predictions'
+    # assert explanation_df[class_pred_cols].astype(str).apply('_'.join, 1).groupby(
+    #     explanation_df[id_cols].astype(str).apply('_'.join, 1)).nunique().max() == 1, \
+    #     'Multiple predict_proba for the same (id, dataset_file_name)'
+    #
+    # for dataset_file_name, explanation_dict in files_dict.items():
+    #     print(f'File: {dataset_file_name}')
+    #     print(f'Number of explanations: {len(explanation_dict)}')
 
-    for filename, explanation_dict in files_dict.items():
-        print(f'File: {filename}')
-        print(f'Number of explanations: {len(explanation_dict)}')
+
+def load_experiment_result_by_code(experiment_code, results_path):
+    """
+    Load the results of the experiments given the experiment code
+    :param experiment_code: experiment codes
+    :param results_path: path to the dataset results
+    :return: a pandas dataframe with the results
+    """
+    full_experiment_path = os.path.join(results_path, experiment_code)
+    # scan the directory. In each subfolder there is a json file with the params and a pkl file with the results
+    # create a list of results containing in each item a pair of params and the results
+    results_list = []
+    for folder in os.scandir(full_experiment_path):
+        if not folder.is_dir():
+            continue
+        for file in os.scandir(folder):
+            if file.name.endswith('.json'):
+                with open(file, 'r') as f:
+                    params = json.load(f)
+            elif file.name.endswith('.pkl'):
+                with open(file, 'rb') as f:
+                    results = pickle.load(f)
+        results_list.append((params, results))
+    return results_list
 
 
 if __name__ == '__main__':
