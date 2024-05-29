@@ -3,65 +3,95 @@ import sys
 import explainable_fact_checking as xfc
 
 
-class CONSTANTS:
+class C:
     MODEL_DIR = 'models'
     PREDICTION_DIR = 'predictions'
     EVALUATION_DIR = 'evaluation'
-    RESULTS_DIR = '/homes/bussotti/feverous_work/feverousdata/AB/experiments'
-    DATASET_DIR_FEVEROUS = ['/homes/bussotti/feverous_work/feverousdata/AB/']
+    RESULTS_DIR = '/home/bussotti/XFCresults/experiments'
+    DATASET_DIR_FEVEROUS = ['/home/bussotti/XFCresults/']
+    BASE_CONFIG = dict(results_dir=RESULTS_DIR, random_seed=[1], )
+    feverous_datasets_conf = dict(dataset_name='feverous',
+                                  dataset_params=dict(
+                                      dataset_dir=DATASET_DIR_FEVEROUS,
+                                      dataset_file=[
+                                          'ex_AB_00.jsonl',
+                                          'feverous_train_challenges_withnoise.jsonl',
+                                          'original_TO_01_formatted.jsonl',
+                                          'feverous_dev_ST_01.jsonl',
+                                          'feverous_dev_SO_01.jsonl',
+                                      ],
+                                      top=[1000]),
+                                  )
+    JF_feverous_model = dict(model_name=['default'], model_params=dict(
+        model_path=['/homes/bussotti/feverous_work/feverousdata/models_fromjf270623or']), )
+
+    baseline_feverous_model = dict(
+        model_name=['default'],
+        model_params=dict(
+            model_path=[
+                '/homes/bussotti/feverous_work/feverousdata/modeloriginalfeverousforandrea/feverous_verdict_predictor']),
+    )
+
+    lime_only_ev = dict(explainer_name=['lime'],
+                        explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[500], ),
+                        )
+
+    shap_only_ev = dict(explainer_name=['shap'],
+                        explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
+                                              num_samples=[500], ),
+                        )
 
 
 REQUIRED_FIELDS = ['experiment_id', 'dataset_name', 'model_name', 'explainer_name',
                    ]
 
-base_config = dict(
-    results_dir=CONSTANTS.RESULTS_DIR,
-
-)
-
 experiment_definitions = [
-    base_config.copy() | dict(
-        experiment_id='sk_f_jf_1.0',
-        dataset_name='feverous',
-        dataset_params=dict(
-            dataset_dir=CONSTANTS.DATASET_DIR_FEVEROUS,
-            dataset_file=[
-                'ex_AB_00.jsonl',
-                # 'original_TO_01_formatted.jsonl',
-                # 'feverous_dev_ST_01.jsonl',
-                # 'feverous_dev_SO_01.jsonl',
-            ],
+    dict(experiment_id='sk_f_jf_1.0', ) | C.BASE_CONFIG |
+    C.JF_feverous_model | C.lime_only_ev | C.feverous_datasets_conf,
 
-            top=[1000]),
-        model_name=['default'],
-        explainer_name=['lime'],
-        random_seed=[1],
-        model_params=dict(pathModel=['models_fromjf270623or']),
-        explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'], num_samples=[500], ),
-    ),
-    base_config.copy() | dict(
-        experiment_id='sk_f_jf_1.1',
-        dataset_name='feverous',
-        dataset_params=dict(
-            dataset_dir=CONSTANTS.DATASET_DIR_FEVEROUS,
-            dataset_file=[
-                'ex_AB_00.jsonl',
-                # 'original_TO_01_formatted.jsonl',
-                # 'feverous_dev_ST_01.jsonl',
-                # 'feverous_dev_SO_01.jsonl',
-            ],
+    dict(experiment_id='sk_f_jf_1.1', ) | C.BASE_CONFIG |
+    C.JF_feverous_model | C.shap_only_ev | dict(dataset_name='feverous',
+                                                dataset_params=dict(
+                                                    dataset_dir=C.DATASET_DIR_FEVEROUS,
+                                                    dataset_file=[
+                                                        'ex_AB_00.jsonl',
+                                                    ],
+                                                    top=[1000]),
+                                                ),
+    dict(experiment_id='sk_f_jf_1.1b', ) | C.BASE_CONFIG |
+    C.JF_feverous_model | C.shap_only_ev | dict(dataset_name='feverous',
+                                                dataset_params=dict(
+                                                    dataset_dir=C.DATASET_DIR_FEVEROUS,
+                                                    dataset_file=[
+                                                        'original_TO_01_formatted.jsonl',
+                                                        'feverous_dev_ST_01.jsonl',
+                                                        'feverous_dev_SO_01.jsonl',
+                                                    ],
+                                                    top=[1000]),
+                                                ),
+    dict(experiment_id='sk_f_jf_1.1n', ) | C.BASE_CONFIG |
+    C.JF_feverous_model | C.shap_only_ev | dict(dataset_name='feverous',
+                                                dataset_params=dict(
+                                                    dataset_dir=C.DATASET_DIR_FEVEROUS,
+                                                    dataset_file=[
+                                                        'feverous_train_challenges_withnoise.jsonl',
+                                                    ],
+                                                    top=[1000]),
+                                                ),
 
-            top=[1000]),
-        model_name=['default'],
-        explainer_name=['shap'],
-        random_seed=[1],
-        model_params=dict(pathModel=['models_fromjf270623or']),
-        explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'], num_samples=[500], ),
-    ),
+    dict(experiment_id='f_bs_1.0', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.lime_only_ev | C.feverous_datasets_conf,
+
+    dict(experiment_id='f_bs_1.1', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.shap_only_ev | C.feverous_datasets_conf,
 
 ]
 
+# 'feverous_train_challenges_withnoise.jsonl',
+
 experiment_definitions_dict = {x['experiment_id']: x for x in experiment_definitions}
+# check that there are only unique experiment ids
+assert len(experiment_definitions_dict) == len(experiment_definitions), 'Experiment ids are not unique.'
 
 
 def get_config_by_id(experiment_id, config_file_path=None):
