@@ -207,7 +207,7 @@ class FeverousModelAdapter:
                                             'feverous_dev_challenges_sentencesandtable.jsonl',
                                             ['jf_home/feverous_wikiv1.db'],
                                             [self.tmp_file], '', None, None, True, True,
-                                            pathModel=self.model_path.split('/')[-1])
+                                            pathModel=self.model_path)
 
         with open(self.base_path + self.tmp_pred_file + '_predictor.jsonl', 'r') as file:
             predictions = [json.loads(line) for line in file if line != '\n']

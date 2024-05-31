@@ -214,7 +214,7 @@ def exec_predictor_alt_devdb_quick(db_path, data_path, exp_name, db_path_test, d
                                                                  data_path + "/models", db_path_test)
         else:
             baseline.predictor.evaluate_verdict_predictor5.main2(data_path + "/fake_dev_cells.jsonl",
-                                                                 data_path + "/" + pathModel, db_path_test)
+                                                                 pathModel, db_path_test)
         f = open(data_path + "/fake_dev_cells.verdict.jsonl", 'r')
 
         obj = []
