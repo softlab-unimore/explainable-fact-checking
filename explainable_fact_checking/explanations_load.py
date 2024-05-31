@@ -41,7 +41,7 @@ def explanations_to_df_lime(explanations_files):
     for dataset_file_name, explanation_dict in explanations_files.items():
         for explanation_key, explanation in explanation_dict.items():
             tdict = {}
-            texp_list = lime_explanation_to_dict_olap(explanation)
+            texp_list = explanation_to_dict_olap(explanation)
 
             out_list += [tdict | x for x in texp_list]
     ret_df = pd.DataFrame(out_list)
@@ -80,9 +80,13 @@ def explanations_to_df(explanations_list: list):
                 else:
                     tdict[key] = value
             tdict['dataset_file_name'] = tdict.pop('dataset_file')
-            texp_list = lime_explanation_to_dict_olap(explanation)
+            texp_list = explanation_to_dict_olap(explanation)
             out_list += [tdict | x for x in texp_list]
     ret_df = pd.DataFrame(out_list)
+    # convert the following columns in categorical ['type', 'dataset_file_name', 'model_path', 'model_name', 'perturbation_mode', 'mode']
+    for col in ['type', 'dataset_file_name', 'model_path', 'model_name', 'perturbation_mode', 'mode']:
+        if col in ret_df.columns:
+            ret_df[col] = ret_df[col].astype('category')
     # sort columns
     # first ['unit_text', 'unit_index',  'SUPPORTS', 'REFUTES', 'NOT ENOUGH INFO',] then the rest
     columns = ['unit_text', 'unit_index', 'SUPPORTS', 'REFUTES', 'NOT ENOUGH INFO']
@@ -91,14 +95,17 @@ def explanations_to_df(explanations_list: list):
     return ret_df.apply(pd.to_numeric, errors='ignore')
 
 
-def lime_explanation_to_dict_olap(exp):
+def explanation_to_dict_olap(exp):
     """
     Create a dictionary from a lime explanation object
     """
-    get_method = lambda x: getattr(exp, x) if hasattr(exp, x) else (exp[x] if x in exp else None)
+    if isinstance(exp, dict):
+        get_method = lambda x: exp.get(x, None)
+    else:
+        get_method = lambda x: getattr(exp, x) if hasattr(exp, x) else None
     ret_list = []
     out_dict = {}
-    for key in ['num_samples', 'label', 'execution_time','id']:
+    for key in ['num_samples', 'label', 'execution_time', 'id']:
         out_dict[key] = get_method(key)
     # out_dict['local_pred'] = exp.local_pred[0]
     if 'label' not in out_dict and get_method('record') is not None:
@@ -111,26 +118,27 @@ def lime_explanation_to_dict_olap(exp):
 
     # create a dictionary exp_by_unit which has as key the index of unit explained and as value a dictionary with the impacts on each class
     local_exp = get_method('local_exp')
-    exp_by_unit = {i: {} for i in range(len(local_exp[0]))}
-    for i, tclass in enumerate(class_names):
-        tclass_exp = local_exp[i]
-        for unit_index, impact in tclass_exp:
-            exp_by_unit[unit_index][tclass] = impact
+    if local_exp is not None:
+        exp_by_unit = {i: {} for i in range(len(local_exp[0]))}
+        for i, tclass in enumerate(class_names):
+            tclass_exp = local_exp[i]
+            for unit_index, impact in tclass_exp:
+                exp_by_unit[unit_index][tclass] = impact
 
-    # for each element of the explanation create a dictionary with its impacts on each class
-    domain_mapper = get_method('domain_mapper')
-    for unit_index, impact_dict in exp_by_unit.items():
-        tdict = impact_dict | out_dict
-        tdict['unit_index'] = unit_index
-        tdict['unit_text'] = domain_mapper.indexed_string.inverse_vocab[unit_index]
-        tdict['type'] = 'evidence'
-        ret_list.append(tdict)
+        # for each element of the explanation create a dictionary with its impacts on each class
+        domain_mapper = get_method('domain_mapper')
+        for unit_index, impact_dict in exp_by_unit.items():
+            tdict = impact_dict | out_dict
+            tdict['unit_index'] = unit_index
+            tdict['unit_text'] = domain_mapper.indexed_string.inverse_vocab[unit_index]
+            tdict['type'] = 'evidence'
+            ret_list.append(tdict)
 
-    # Adding the noisetag if available for noisy evidence
-    noisetag = get_method('record')['noisetag']
-    if noisetag is not None:
-        for i in range(len(ret_list)):
-            ret_list[i]['noisetag'] = noisetag[i]
+        # Adding the noisetag if available for noisy evidence
+        noisetag = get_method('record').get('noisetag', None)
+        if noisetag is not None:
+            for i in range(len(ret_list)):
+                ret_list[i]['noisetag'] = noisetag[i]
 
     # Adding the claim in unit_text and intercept in the impact
     claim_text = get_method('claim')
@@ -192,28 +200,49 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
 
 
 def load_preprocess_explanations():
-    x = load_experiment_result_by_code('sk_f_jf_1.1n', xfc.experiment_definitions.C.RESULTS_DIR)
-    explanation_df = explanations_to_df(x)
+    exp_list = []
+    for experiment_code in [
+        'sk_f_jf_1.1',
+        'sk_f_jf_1.0',
+        'sk_f_jf_1.1b',
+        'sk_f_jf_1.1n',
+        'f_bs_1.0',
+        'f_bs_1.1',
+    ]:
+        x = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
+        exp_list += x
+
+    only_claim_list = []
+    for experiment_code in [
+        'oc_1.0',
+        'oc_1.1',
+    ]:
+        only_claim = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
+        only_claim_list += only_claim
+
+    explanation_df = explanations_to_df(exp_list)
+    only_claim_predictions_df = explanations_to_df(only_claim_list)
+    only_claim_predictions_df['type'] = 'only_claim'
 
     # files_dict = load_explanations_lime(dir='/home/bussotti/XFCresults/lime_explanations')
     # explanation_df = explanations_to_df_lime(files_dict)
 
-    id_cols = ['dataset_file_name', 'id']
+    id_cols = ['dataset_file_name', 'id', 'model_path']
 
     index_exp = explanation_df[id_cols]
     class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names]
 
-    # only_claim_predictions_df = load_only_claim_predictions()
-    # only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
-    # common_index = pd.MultiIndex.from_frame(index_exp).intersection(
-    #     only_claim_predictions_df.index)
-    # only_claim_predictions_df = only_claim_predictions_df.loc[common_index].reset_index()
-    # mask = explanation_df['type'] == 'claim_intercept'
-    # only_claim_predictions_df = only_claim_predictions_df.merge(explanation_df.loc[mask, id_cols + class_pred_cols])
-    #
-    # all_df = pd.concat([explanation_df, only_claim_predictions_df], ignore_index=True)
+    only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
+    common_index = pd.MultiIndex.from_frame(index_exp).intersection(
+        only_claim_predictions_df.index)
+    only_claim_predictions_df = only_claim_predictions_df.loc[common_index].reset_index().drop(columns=class_pred_cols)
+    mask = explanation_df['type'] == 'claim_intercept'
+    only_claim_predictions_df = only_claim_predictions_df.merge(explanation_df.loc[mask, id_cols + class_pred_cols],
+                                                                on=id_cols)
 
-    all_df = explanation_df
+    all_df = pd.concat([explanation_df, only_claim_predictions_df], ignore_index=True)
+
+    # all_df = explanation_df
     # sort all_df by dataset_file_name and id
     all_df.sort_values(by=id_cols, inplace=True)
 
@@ -222,6 +251,8 @@ def load_preprocess_explanations():
         tmask = all_df['predicted_label'] == tclass
         all_df.loc[tmask, 'score_on_predicted_label'] = all_df.loc[tmask, tclass]
 
+    # take last part of model_path as model_name
+    all_df['model_id'] = all_df['model_path'].apply(lambda x: x.split('/')[-1])
     # save the explanations to a csv file
     all_df.to_csv(os.path.join(xfc.experiment_definitions.C.RESULTS_DIR, 'all_exp.csv'), index=False)
 
@@ -238,7 +269,7 @@ def load_preprocess_explanations():
     #     print(f'Number of explanations: {len(explanation_dict)}')
 
 
-def load_experiment_result_by_code(experiment_code, results_path):
+def load_experiment_result_by_code(experiment_code, results_path) -> list:
     """
     Load the results of the experiments given the experiment code
     :param experiment_code: experiment codes
@@ -252,6 +283,7 @@ def load_experiment_result_by_code(experiment_code, results_path):
     for folder in os.scandir(full_experiment_path):
         if not folder.is_dir():
             continue
+        params, results = None, None
         for file in os.scandir(folder):
             if file.name.endswith('.json'):
                 with open(file, 'r') as f:
