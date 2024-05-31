@@ -15,20 +15,18 @@ from typing_extensions import deprecated
 import explainable_fact_checking as xfc
 
 
-
 class LimeXFCAdapter:
-    def __init__(self,perturbation_mode, num_samples=50, random_seed=42, **kwargs):
-        self.kwargs = kwargs
+    def __init__(self, perturbation_mode, num_samples=50, random_seed=42):
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
-
 
     def __call__(self, *args, **kwargs):
         return self.explain(*args, **kwargs)
 
     def explain(self, record, predictor):
-        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True, perturbation_mode=self.perturbation_mode)
+        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True,
+                                                         perturbation_mode=self.perturbation_mode)
 
         explainer = LimeTextExplainer(
             split_expression=xfc_wrapper.tokenizer,
@@ -57,7 +55,8 @@ class LimeXFCAdapter:
         return exp
 
 
-def explain_with_lime(self, file_to_explain, predictor, output_dir, num_samples, top=None, perturbation_mode='only_evidence',
+def explain_with_lime(self, file_to_explain, predictor, output_dir, num_samples, top=None,
+                      perturbation_mode='only_evidence',
                       random_seed=42):
     data = []
     early_stop = top is not None
@@ -77,7 +76,8 @@ def explain_with_lime(self, file_to_explain, predictor, output_dir, num_samples,
     logger = xfc.xfc_utils.init_logger(exp_dir)
 
     for record in data:
-        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True, perturbation_mode=perturbation_mode)
+        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True,
+                                                         perturbation_mode=perturbation_mode)
 
         explainer = LimeTextExplainer(
             split_expression=xfc_wrapper.tokenizer,
@@ -135,10 +135,8 @@ def explain_with_lime(self, file_to_explain, predictor, output_dir, num_samples,
         #     json.dump(exp_dict, file)
 
 
-
 class ShapXFCAdapter:
-    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, **kwargs):
-        self.kwargs = kwargs
+    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42):
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
@@ -148,8 +146,9 @@ class ShapXFCAdapter:
         return self.explain(*args, **kwargs)
 
     def explain(self, record, predictor):
-        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True, perturbation_mode=self.perturbation_mode,
-                                            explainer='shap')
+        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor=predictor, debug=True,
+                                                         perturbation_mode=self.perturbation_mode,
+                                                         explainer='shap')
         evidence_array = xfc_wrapper.get_evidence_list_SHAP()
         # set numpy random state
         np.random.seed(self.random_seed)
@@ -185,7 +184,8 @@ class ShapXFCAdapter:
             raise ValueError(f"Invalid mode {self.mode}")
         time_elapsed = (b - a).total_seconds()
         # convert the explanation to the same format of LIME
-        local_exp = {i: [(j, shap_values[j]) for j in range(len(shap_values))] for i, shap_values in enumerate(exp.T)}
+        local_exp = {i: [(j, shap_values[j]) for j in range(len(shap_values))] for i, shap_values in
+                     enumerate(exp[0].T)}
         indexed_string = lime.lime_text.IndexedString(raw_string=xfc_wrapper.get_text_to_perturb(),
                                                       split_expression=xfc_wrapper.tokenizer, bow=False, )
         domain_mapper = lime.lime_text.TextDomainMapper(indexed_string=indexed_string)
@@ -211,8 +211,10 @@ class ShapXFCAdapter:
             random_seed=self.random_seed,
             explainer='SHAP',
             mode=self.mode,
+            intercept=predict_proba - np.sum(exp[0], axis=0)
         )
         return exp_dict
+
 
 def explain_with_SHAP(file_to_explain, predictor, output_dir, num_samples, top=None, perturbation_mode='only_evidence',
                       random_seed=42, model_name=None, mode='Permutation'):
@@ -230,8 +232,9 @@ def explain_with_SHAP(file_to_explain, predictor, output_dir, num_samples, top=N
         predictor = fc_model.predict
 
     for record in data:
-        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True, perturbation_mode=perturbation_mode,
-                                            explainer='shap')
+        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True,
+                                                         perturbation_mode=perturbation_mode,
+                                                         explainer='shap')
         evidence_array = xfc_wrapper.get_evidence_list_SHAP()
         # set numpy random state
         np.random.seed(random_seed)
@@ -307,6 +310,24 @@ def explain_with_SHAP(file_to_explain, predictor, output_dir, num_samples, top=N
             pickle.dump(exp_dict, file)
 
 
+class OnlyClaimPredictor:
+
+    def __init__(self, random_seed=42):
+        self.random_seed = random_seed
+
+    def explain_list(self, record_list, predict_method):
+        for record in record_list:
+            record['evidence'] = []
+            # delete the input_txt_to_use field if present
+            if 'input_txt_to_use' in record:
+                del record['input_txt_to_use']
+        predictions = predict_method.predict_legacy(record_list)
+        full_predictions = predict_method.predictions
+        for record, pred in zip(record_list, full_predictions):
+            record['input_txt_to_use'] = pred['input_txt_model']
+            record['claim'] = pred['claim']
+            record['intercept'] = record['predict_proba'] = pred['predicted_scores']
+        return record_list
 
 
 explainer_factory = xfc.xfc_utils.GeneralFactory()
@@ -314,3 +335,4 @@ explainer_factory = xfc.xfc_utils.GeneralFactory()
 # Register the explainers
 explainer_factory.register_creator('lime', LimeXFCAdapter)
 explainer_factory.register_creator('shap', ShapXFCAdapter)
+explainer_factory.register_creator('claim_only_pred', OnlyClaimPredictor)
