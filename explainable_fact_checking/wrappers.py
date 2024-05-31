@@ -59,7 +59,7 @@ class FeverousRecordWrapper:
     evidence_separator = r' </s> '
     reference_record = {}
 
-    def __init__(self, record, predict_method, separator=r' </s> ', perturbation_mode='only_evidence', explainer='lime',
+    def __init__(self, record, predictor, separator=r' </s> ', perturbation_mode='only_evidence', explainer='lime',
                  debug=False):
         self.record = record
         self.evidence_index_map = self.generate_evidence_index_map(record)
@@ -82,7 +82,7 @@ class FeverousRecordWrapper:
         else:
             assert 'claim' in record, 'Claim not found in record'
         self.separator = separator
-        self.predict_method = predict_method
+        self.predict_method = predictor
         self.id = record['id']
         self.explainer = explainer
 

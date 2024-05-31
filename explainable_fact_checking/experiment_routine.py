@@ -114,7 +114,7 @@ class ExperimentRunner:
 
         dataset = xfc.datasets_loaders.dataset_loader_factory.create(dataset_name, **dataset_params)
         model = xfc.models.model_factory.create(model_name, random_state=random_seed, **model_params)
-        explainer = xfc.explainers.explainer_factory.create(explainer_name, **explainer_params)  # todo
+        explainer = xfc.explainers.explainer_factory.create(explainer_name, **explainer_params)
         exp_list = []
         if hasattr(explainer, 'explain_list'):
             try:
@@ -124,7 +124,7 @@ class ExperimentRunner:
         else:
             for i, record in tqdm(enumerate(dataset)):
                 try:
-                    exp = explainer.explain(record=record, predict_method=model)
+                    exp = explainer.explain(record=record, predictor=model)
                     exp_list.append(exp)
                 except Exception as e:
                     logger.error(f"Error in record {i}")

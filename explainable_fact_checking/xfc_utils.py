@@ -166,7 +166,7 @@ def init_logger(save_dir: str) -> logging.Logger:
     logger.addHandler(c_handler)
     logger.addHandler(f_handler)
 
-    def handle_exception(exc_type, exc_value, exc_traceback):
+    def except_hook(exc_type, exc_value, exc_traceback):
         # Handle exception
         if issubclass(exc_type, KeyboardInterrupt):
             # Call the default KeyboardInterrupt handler
@@ -177,11 +177,31 @@ def init_logger(save_dir: str) -> logging.Logger:
         # Then propagate the exception
         raise exc_value
 
-    sys.excepthook = handle_exception
+    sys.excepthook = except_hook
 
     return logger
 
+def handle_exception(e, logger):
+    """
+    Handle an exception by logging it and raising it again if the code is being debugged.
 
+    Parameters
+    ----------
+    e : Exception
+        The exception to be handled.
+    logger : logging.Logger
+        The logger to be used for logging the exception.
+
+    Returns
+    -------
+    None
+    """
+    logger.error(e)
+    gettrace = getattr(sys, 'gettrace', None)
+    if gettrace is None:
+        pass
+    elif gettrace():
+        raise e
 
 class GeneralFactory:
     def __init__(self):
