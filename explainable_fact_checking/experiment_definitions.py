@@ -8,6 +8,7 @@ class C:
     PREDICTION_DIR = 'predictions'
     EVALUATION_DIR = 'evaluation'
     RESULTS_DIR = '/home/bussotti/XFCresults/experiments'
+    PLOT_DIR =  '/home/bussotti/XFCresults/plots'
     DATASET_DIR_FEVEROUS = ['/home/bussotti/XFCresults/']
     BASE_CONFIG = dict(results_dir=RESULTS_DIR, random_seed=[1], )
     feverous_datasets_conf = dict(dataset_name='feverous',
@@ -40,6 +41,8 @@ class C:
                         explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
                                               num_samples=[500], ),
                         )
+
+    claim_only_explainer = dict(explainer_name=['claim_only_pred'], explainer_params=dict(), )
 
 
 REQUIRED_FIELDS = ['experiment_id', 'dataset_name', 'model_name', 'explainer_name',
@@ -84,6 +87,12 @@ experiment_definitions = [
 
     dict(experiment_id='f_bs_1.1', ) | C.BASE_CONFIG |
     C.baseline_feverous_model | C.shap_only_ev | C.feverous_datasets_conf,
+
+    dict(experiment_id='oc_1.0', ) | C.BASE_CONFIG |
+    C.JF_feverous_model | C.claim_only_explainer | C.feverous_datasets_conf,
+
+    dict(experiment_id='oc_1.1', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.claim_only_explainer | C.feverous_datasets_conf,
 
 ]
 
