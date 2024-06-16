@@ -8,7 +8,7 @@ class C:
     PREDICTION_DIR = 'predictions'
     EVALUATION_DIR = 'evaluation'
     RESULTS_DIR = '/home/bussotti/XFCresults/experiments'
-    PLOT_DIR =  '/home/bussotti/XFCresults/plots'
+    PLOT_DIR = '/home/bussotti/XFCresults/plots'
     DATASET_DIR_FEVEROUS = ['/home/bussotti/XFCresults/']
     BASE_CONFIG = dict(results_dir=RESULTS_DIR, random_seed=[1], )
     feverous_datasets_conf = dict(dataset_name='feverous',
@@ -86,7 +86,33 @@ experiment_definitions = [
     C.baseline_feverous_model | C.lime_only_ev | C.feverous_datasets_conf,
 
     dict(experiment_id='f_bs_1.1', ) | C.BASE_CONFIG |
-    C.baseline_feverous_model | C.shap_only_ev | C.feverous_datasets_conf,
+    C.baseline_feverous_model | C.shap_only_ev | dict(dataset_name='feverous',
+                                                      dataset_params=dict(
+                                                          dataset_dir=C.DATASET_DIR_FEVEROUS,
+                                                          dataset_file=[
+                                                              'ex_AB_00.jsonl',
+                                                              'feverous_train_challenges_withnoise.jsonl',
+                                                          ],
+                                                          top=[1000]),
+                                                      ),
+
+    dict(experiment_id='f_bs_1.1b', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.shap_only_ev | dict(dataset_name='feverous',
+                                                      dataset_params=dict(
+                                                          dataset_dir=C.DATASET_DIR_FEVEROUS,
+                                                          dataset_file=[
+                                                              'feverous_dev_SO_01.jsonl',
+                                                              'original_TO_01_formatted.jsonl',
+                                                          ],
+                                                          top=[1000]),
+                                                      ),
+    dict(experiment_id='f_bs_1.1c', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.shap_only_ev | dict(dataset_name='feverous',
+                                                      dataset_params=dict(
+                                                          dataset_dir=C.DATASET_DIR_FEVEROUS,
+                                                          dataset_file=["feverous_dev_ST_01.jsonl", ],
+                                                          top=[1000]),
+                                                      ),
 
     dict(experiment_id='oc_1.0', ) | C.BASE_CONFIG |
     C.JF_feverous_model | C.claim_only_explainer | C.feverous_datasets_conf,

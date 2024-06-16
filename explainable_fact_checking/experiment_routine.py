@@ -142,10 +142,6 @@ class ExperimentRunner:
 
 
 experiment_done = [
-
-]
-
-experiments_doing = [
     'sk_f_jf_1.0',
     'sk_f_jf_1.1',
     'sk_f_jf_1.1b',
@@ -156,13 +152,20 @@ experiments_doing = [
     # only claim
     'oc_1.0',
     'oc_1.1',
+'f_bs_1.1b',
+    'f_bs_1.1c',
+
+
+]
+
+experiments_doing = [
+
 ]
 
 # main thing to start the experiment
 if __name__ == "__main__":
 
     experiments_to_run = [
-
     ]
 
     experiment_runner = ExperimentRunner()

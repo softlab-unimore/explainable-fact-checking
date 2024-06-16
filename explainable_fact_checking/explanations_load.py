@@ -111,7 +111,7 @@ def explanation_to_dict_olap(exp):
     if 'label' not in out_dict and get_method('record') is not None:
         out_dict['label'] = get_method('record')['label']
     class_names = get_method('class_names')
-    class_names = xfc.xfc_utils.class_names if class_names is None else class_names
+    class_names = xfc.xfc_utils.class_names_load if class_names is None else class_names
     # save predict_proba of each class
     for i, tclass in enumerate(class_names):
         out_dict[tclass + '_predict_proba'] = get_method('predict_proba')[i]
@@ -193,7 +193,7 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
             key_to_copy = ['id', 'label']
             for key in key_to_copy:
                 t2dict[key] = record[key]
-            for i, tclass in enumerate(xfc.xfc_utils.class_names):
+            for i, tclass in enumerate(xfc.xfc_utils.class_names_load):
                 t2dict[tclass] = record['predicted_scores'][i]
             out_list.append(t2dict)
     return pd.DataFrame(out_list)
@@ -208,6 +208,8 @@ def load_preprocess_explanations():
         'sk_f_jf_1.1n',
         'f_bs_1.0',
         'f_bs_1.1',
+        'f_bs_1.1b',
+    'f_bs_1.1c',
     ]:
         x = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
         exp_list += x
@@ -230,7 +232,7 @@ def load_preprocess_explanations():
     id_cols = ['dataset_file_name', 'id', 'model_path']
 
     index_exp = explanation_df[id_cols]
-    class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names]
+    class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names_load]
 
     only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
     common_index = pd.MultiIndex.from_frame(index_exp).intersection(
@@ -247,13 +249,27 @@ def load_preprocess_explanations():
     all_df.sort_values(by=id_cols, inplace=True)
 
     all_df['predicted_label'] = all_df[class_pred_cols].idxmax(axis=1).str.replace('_predict_proba', '')
-    for tclass in xfc.xfc_utils.class_names:
+    for tclass in xfc.xfc_utils.class_names_load:
         tmask = all_df['predicted_label'] == tclass
         all_df.loc[tmask, 'score_on_predicted_label'] = all_df.loc[tmask, tclass]
 
     # take last part of model_path as model_name
     all_df['model_id'] = all_df['model_path'].apply(lambda x: x.split('/')[-1])
     # save the explanations to a csv file
+    # correction of label. Load dataset files by adding '_orig.jsonl' and replace the label with the one in the original file
+    # load the original dataset files
+    for dataset_file_name in all_df['dataset_file_name'].unique():
+        dataset_file_name_orig = dataset_file_name.replace('.jsonl', '_orig.jsonl')
+        tpath = os.path.join(xfc.experiment_definitions.C.DATASET_DIR_FEVEROUS[0], dataset_file_name_orig)
+        if not os.path.exists(tpath):
+            continue
+        with open(tpath, 'r') as f:
+            orig_records = [json.loads(x) for x in f]
+        orig_records_dict = {x['id']: x for x in orig_records}
+        mask = all_df['dataset_file_name'] == dataset_file_name
+        all_df.loc[mask, 'label'] = all_df.loc[mask, 'id'].apply(lambda x: orig_records_dict[x]['label'])
+
+
     all_df.to_csv(os.path.join(xfc.experiment_definitions.C.RESULTS_DIR, 'all_exp.csv'), index=False)
 
     # assert (pd.Series(only_claim_predictions_df[id_cols].astype(str).apply('_'.join, 1).unique()).isin(explanation_df[
@@ -282,6 +298,8 @@ def load_experiment_result_by_code(experiment_code, results_path) -> list:
     results_list = []
     for folder in os.scandir(full_experiment_path):
         if not folder.is_dir():
+            continue
+        if 'old' in folder.name:
             continue
         params, results = None, None
         for file in os.scandir(folder):
