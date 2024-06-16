@@ -6,7 +6,8 @@ import sys
 import numpy as np
 import scipy.stats as st
 
-class_names = ['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES']
+class_names = ['NEI', 'SUPPORTS', 'REFUTES']
+class_names_load = ['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES']
 
 
 # st.t.interval(0.95, len(a)-1, loc=np.mean(a), scale=st.sem(a))
