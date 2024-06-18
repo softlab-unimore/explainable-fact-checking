@@ -10,7 +10,6 @@ import shap
 
 from lime.lime_text import LimeTextExplainer
 from shap import Explanation
-from typing_extensions import deprecated
 
 import explainable_fact_checking as xfc
 

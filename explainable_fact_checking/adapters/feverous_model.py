@@ -8,9 +8,9 @@ import numpy as np
 import sys
 
 # sys.path.append('/homes/bussotti/feverous_work/feverousdata')
-sys.path.append('/homes/bussotti/feverous_work/feverousdata/feverous')
+# sys.path.append('/homes/bussotti/feverous_work/feverousdata/feverous')
 
-from baseline.predictor.evaluate_verdict_predictor5 import main2
+from feverous.baseline.predictor.evaluate_verdict_predictor import main2
 
 from explainable_fact_checking.adapters import predictor_universal_ABC as predictor_universal
 

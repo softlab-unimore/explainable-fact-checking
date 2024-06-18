@@ -1,7 +1,8 @@
 import sys
-import baseline.predictor.train_verdict_predictor
+import feverous.baseline.predictor.train_verdict_predictor as train_p
 import shutil
-import baseline.predictor.evaluate_verdict_predictor5
+import feverous.baseline.predictor.evaluate_verdict_predictor5 as ev_p5
+
 import json
 import os
 
@@ -41,7 +42,7 @@ def exec_predictor_alt_devdb(db_path, data_path, exp_name, db_path_test, dev_tra
     f_d_s.close()
     f_d_t.close()
 
-    baseline.predictor.train_verdict_predictor.main2(data_path, db_path, data_path + "/models")
+    train_p.main2(data_path, db_path, data_path + "/models")
 
     f_d_t = open(data_path + "/dev.jsonl", "w")
     f_d_s = open(data_path + "/" + dev_test, "r")
@@ -59,8 +60,8 @@ def exec_predictor_alt_devdb(db_path, data_path, exp_name, db_path_test, dev_tra
             '############################################################################################################')
 
         gen_fake_text(data_path)
-        baseline.predictor.evaluate_verdict_predictor5.main2(data_path + "/fake_dev_cells.jsonl", data_path + "/models",
-                                                             db_path_test)
+        ev_p5.main2(data_path + "/fake_dev_cells.jsonl", data_path + "/models",
+                    db_path_test)
 
         f = open(data_path + "/fake_dev_cells.verdict.jsonl", 'r')
 
@@ -191,7 +192,7 @@ def exec_predictor_alt_devdb_quick(db_path, data_path, exp_name, db_path_test, d
     f_d_s.close()
     f_d_t.close()
     if not useSavedModel:
-        baseline.predictor.train_verdict_predictor.main2(data_path, db_path, data_path + "/models")
+        train_p.main2(data_path, db_path, data_path + "/models")
 
     f_d_t = open(data_path + "/dev.jsonl", "w")
     f_d_s = open(data_path + "/" + dev_test, "r")
@@ -210,11 +211,11 @@ def exec_predictor_alt_devdb_quick(db_path, data_path, exp_name, db_path_test, d
 
         gen_fake_text(data_path)
         if not useSavedModel:
-            baseline.predictor.evaluate_verdict_predictor5.main2(data_path + "/fake_dev_cells.jsonl",
-                                                                 data_path + "/models", db_path_test)
+            ev_p5.main2(data_path + "/fake_dev_cells.jsonl",
+                        data_path + "/models", db_path_test)
         else:
-            baseline.predictor.evaluate_verdict_predictor5.main2(data_path + "/fake_dev_cells.jsonl",
-                                                                 pathModel, db_path_test)
+            ev_p5.main2(data_path + "/fake_dev_cells.jsonl",
+                        pathModel, db_path_test)
         f = open(data_path + "/fake_dev_cells.verdict.jsonl", 'r')
 
         obj = []
