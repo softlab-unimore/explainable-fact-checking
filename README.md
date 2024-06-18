@@ -4,7 +4,7 @@ Code repository for the paper 2598 at EMNLP 2024.
 
 # Our proposal
 
-![Our Architeture proposal](./Architeture_schema.png "Our Architeture proposal")
+![Our Architeture proposal](img/Architeture_schema.png "Our Architeture proposal")
 
 
 The figure shows our framework
