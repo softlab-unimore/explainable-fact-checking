@@ -3,7 +3,7 @@
 Code repository for the paper 2598 at EMNLP 2024.
 
 # Our proposal
-![Architecture](./Architeture schemasFC.svg)
+![Architecture](./Architeture schemasFC.png)
 
 The figure shows our framework
 to understand the _contribution_ of each evidence in predicting the label for a claim.
