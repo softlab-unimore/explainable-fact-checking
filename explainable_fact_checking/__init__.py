@@ -8,3 +8,8 @@ from . import datasets_loaders
 from . import explainers
 from . import wrappers
 from . import plot
+
+
+
+__version__ = '0.1.0'
+
