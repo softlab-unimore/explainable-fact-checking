@@ -4,8 +4,7 @@ Code repository for the paper 2598 at EMNLP 2024.
 
 # Our proposal
 
-![Our Architeture proposal](img/Architeture_schema.png "Our Architeture proposal")
-
+<img src="img/Architeture_schema.png" alt="Our Architeture proposal" height="500"/>
 
 The figure shows our framework
 to understand the _contribution_ of each evidence in predicting the label for a claim.
@@ -25,7 +24,7 @@ The prediction is thus approximated  expressed as a function of the contribution
 
 $$Pred \approx \sum_{i=1}^{N} \text{contribution}(e_i) + \text{Intercept}$$
 
-where contribution($e_i$) (contribution of evidence $i$) is the contribution over the model
+where contribution( $e_i$ ) (contribution of evidence $i$ ) is the contribution over the model
 prediction detected by an explainer for an evidence. 
 
 
