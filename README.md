@@ -3,6 +3,9 @@
 Code repository for the paper 2598 at EMNLP 2024.
 
 # Our proposal
+
+[Architecture](https://github.com/softlab-unimore/explainable-fact-checking/blob/main/Architeture%20schemasFC.pdf)
+
 <img src="./Architeture schemasFC.svg" width="500">
 
 The figure shows our framework
