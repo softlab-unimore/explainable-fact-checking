@@ -4,8 +4,7 @@ Code repository for the paper 2598 at EMNLP 2024.
 
 # Our proposal
 
-![Our Architeture proposal](img/Architeture_schema.png "Our Architeture proposal")
-
+<img src="img/Architeture_schema.png" alt="Our Architeture proposal" height="500"/>
 
 The figure shows our framework
 to understand the _contribution_ of each evidence in predicting the label for a claim.
