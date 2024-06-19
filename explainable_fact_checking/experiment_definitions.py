@@ -48,7 +48,7 @@ class C:
 REQUIRED_FIELDS = ['experiment_id', 'dataset_name', 'model_name', 'explainer_name',
                    ]
 
-experiment_definitions = [
+experiment_definitions_list = [
     dict(experiment_id='sk_f_jf_1.0', ) | C.BASE_CONFIG |
     C.JF_feverous_model | C.lime_only_ev | C.feverous_datasets_conf,
 
@@ -122,13 +122,6 @@ experiment_definitions = [
 
 ]
 
-# 'feverous_train_challenges_withnoise.jsonl',
-
-experiment_definitions_dict = {x['experiment_id']: x for x in experiment_definitions}
-# check that there are only unique experiment ids
-assert len(experiment_definitions_dict) == len(experiment_definitions), 'Experiment ids are not unique.'
-
-
 def get_config_by_id(experiment_id, config_file_path=None):
     """
     Get the configuration dictionary for a specific experiment id.
@@ -160,19 +153,19 @@ def get_config_by_id(experiment_id, config_file_path=None):
         config_file_path = os.path.abspath(config_file_path)
         sys.path.append(os.path.dirname(config_file_path))
         config_module = __import__(os.path.basename(config_file_path).split('.')[0])
-        experiment_definitions = config_module.experiment_definitions
+        experiment_definitions_list = config_module.experiment_definitions_list
     else:
-        experiment_definitions = xfc.experiment_definitions.experiment_definitions_dict
-    exp_dict = dict()
-    if isinstance(experiment_definitions, dict):
-        exp_dict = experiment_definitions.get(experiment_id, None)
-        if exp_dict is None:
-            raise ValueError(f'Experiment id {experiment_id} not found in the configuration file.')
-    elif isinstance(experiment_definitions, list):
-        for x in experiment_definitions:
-            if x['experiment_id'] == experiment_id:
-                exp_dict = x
-                break
+        experiment_definitions_list = xfc.experiment_definitions.experiment_definitions_list
+
+    if isinstance(experiment_definitions_list, list):
+        experiment_definitions_dict = {x['experiment_id']: x for x in experiment_definitions_list}
+        # check that there are only unique experiment ids
+        assert len(experiment_definitions_dict) == len(experiment_definitions_list), 'Experiment ids are not unique.'
     else:
         raise ValueError('Invalid experiment_definitions type. It must be a list or a dictionary.')
+
+    exp_dict = experiment_definitions_dict.get(experiment_id, None)
+    if exp_dict is None:
+        raise ValueError(f'Experiment id {experiment_id} not found in the configuration file.')
+
     return exp_dict
