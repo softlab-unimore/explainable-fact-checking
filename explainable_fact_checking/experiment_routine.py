@@ -31,6 +31,10 @@ class ExperimentRunner:
         keys = kwargs.keys()
         return [dict(zip(keys, instance)) for instance in itertools.product(*kwargs.values())]
 
+    def launch_experiment_by_id(self, experiment_id: str, config_file_path=None):
+        exp_dict = xfc.experiment_definitions.get_config_by_id(experiment_id, config_file_path)
+        self.launch_experiment_by_config(exp_dict)
+
     def launch_experiment_by_config(self, exp_dict: dict):
         if exp_dict is None:
             raise ValueError(f"{exp_dict} is not a valid experiment id")
@@ -152,9 +156,8 @@ experiment_done = [
     # only claim
     'oc_1.0',
     'oc_1.1',
-'f_bs_1.1b',
+    'f_bs_1.1b',
     'f_bs_1.1c',
-
 
 ]
 
@@ -173,5 +176,4 @@ if __name__ == "__main__":
         if exp_id in experiment_done:
             print(f"Experiment {exp_id} already done, skipping...")
             continue
-        exp_dict = xfc.experiment_definitions.get_config_by_id(exp_id)
-        experiment_runner.launch_experiment_by_config(exp_dict)
+        experiment_runner.launch_experiment_by_id(exp_id)
