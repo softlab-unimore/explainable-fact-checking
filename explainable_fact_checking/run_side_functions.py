@@ -19,6 +19,7 @@ if __name__ == "__main__":
         #'feverous_dev_SO_01.jsonl'
     ]:
         input_file = os.path.join(AB_path, input_file_name)
+        pass
         # output_file = os.path.join(AB_path, input_file_name.replace('.jsonl', '_evidence_type_map.pickle'))
         # with open(input_file, 'r') as f_in, open(output_file, 'w') as f_out:
         #     record_list = [json.loads(line) for line in f_in]
@@ -27,9 +28,6 @@ if __name__ == "__main__":
 
         # output_file = os.path.join(AB_path, input_file_name.replace('.jsonl', '_pred_only_claim.json'))
         # xfc.xfc_utils.save_prediciton_only_claim(input_file, output_file=output_file, model=fc_model)
-
-        xfc.xfc_utils.AddInputTxtToUse.predict_and_save(input_file=input_file,
-                                                        output_file=input_file, model=fc_model)
 
     # input_file = os.path.join(AB_path, 'original_TO_01.jsonl')
     # output_file = os.path.join(AB_path, 'original_TO_01_formatted.jsonl')

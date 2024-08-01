@@ -11,17 +11,20 @@ def gen_fake_text(data_path):
     fake_txt_dev = ""
     f = open(data_path + "/dev.jsonl", "r")
     for line in f:
-        u = line.replace('"evidence"', '"predicted_evidence"')
-        obj = json.loads(u)
-        listq = []
-        for x in obj['predicted_evidence']:
-            listrr = []
-            for rt in x['content']:
-                listrr += [rt]
+        if 'predicted_evidence' not in line:
+            u = line.replace('"evidence"', '"predicted_evidence"')
+            obj = json.loads(u)
+            listq = []
+            for x in obj['predicted_evidence']:
+                listrr = []
+                for rt in x['content']:
+                    listrr += [rt]
 
-            listq += listrr
-            break
-        obj['predicted_evidence'] = listq
+                listq += listrr
+                break
+            obj['predicted_evidence'] = listq
+        else:
+            obj = json.loads(line)
         if not "NOT ENOUGH INFO" in line:
             fake_txt_dev += json.dumps(obj) + '\n'
 
