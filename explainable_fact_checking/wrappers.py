@@ -2,6 +2,7 @@ import copy
 
 import numpy as np
 from transformers import PreTrainedTokenizer
+import explainable_fact_checking as xfc
 
 
 class CustomTokenizer(PreTrainedTokenizer):
@@ -185,8 +186,8 @@ class FeverousRecordWrapper:
         # if 'input_txt_to_use' in keys of dictionary split the string by '<\e>' the first item is the claim from the second to the end are the evidence
         # remove additional spaces
         # return the list of evidence
-        if 'input_txt_to_use' in record:
-            all_el = record['input_txt_to_use'].split(FeverousRecordWrapper.evidence_separator)
+        if xfc.C.TXT_TO_USE in record:
+            all_el = record[xfc.C.TXT_TO_USE].split(FeverousRecordWrapper.evidence_separator)
             evidence_list = all_el[1:]
             # claim = all_el[0]
             return [ev.strip() for ev in evidence_list]

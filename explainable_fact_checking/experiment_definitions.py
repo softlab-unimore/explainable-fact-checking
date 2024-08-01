@@ -23,6 +23,28 @@ class C:
                                       ],
                                       top=[1000]),
                                   )
+    feverous_ds_100 = dict(dataset_name='feverous',
+                           dataset_params=dict(
+                               dataset_dir=DATASET_DIR_FEVEROUS,
+                               dataset_file=[
+                                   'feverous_train_challenges_withnoise.jsonl',
+                                   'original_TO_01_formatted.jsonl',
+                                   'feverous_dev_ST_01.jsonl',
+                                   'feverous_dev_SO_01.jsonl',
+                               ],
+                               top=[100]),
+                           )
+    not_precomputed_datasets_conf = dict(dataset_name='feverous',
+                                         dataset_params=dict(
+                                             dataset_dir=['/home/bussotti/XFCresults/datasets'],
+                                             dataset_file=[
+                                                 'dev.combined.not_precomputed.p5.s5.t3_readable_test.jsonl',
+                                                 'dev.combined.not_precomputed.p5.s5.t3_readable_train.jsonl',
+                                                 'dev.combined.not_precomputed.p5.s20.t3_readable_test.jsonl',
+                                                 'dev.combined.not_precomputed.p5.s20.t3_readable_train.jsonl',
+                                             ],
+                                             top=[1000]),
+                                         )
     JF_feverous_model = dict(model_name=['default'], model_params=dict(
         model_path=['/homes/bussotti/feverous_work/feverousdata/models_fromjf270623or']), )
 
@@ -84,6 +106,8 @@ experiment_definitions_list = [
 
     dict(experiment_id='f_bs_1.0', ) | C.BASE_CONFIG |
     C.baseline_feverous_model | C.lime_only_ev | C.feverous_datasets_conf,
+    dict(experiment_id='f_bs_1.0test', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.lime_only_ev | C.feverous_datasets_conf,
 
     dict(experiment_id='f_bs_1.1', ) | C.BASE_CONFIG |
     C.baseline_feverous_model | C.shap_only_ev | dict(dataset_name='feverous',
@@ -120,7 +144,22 @@ experiment_definitions_list = [
     dict(experiment_id='oc_1.1', ) | C.BASE_CONFIG |
     C.baseline_feverous_model | C.claim_only_explainer | C.feverous_datasets_conf,
 
+    # retrived datasets not_precomputed
+    dict(experiment_id='fbs_np_1.0', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.lime_only_ev | C.not_precomputed_datasets_conf,
+
+    dict(experiment_id='fbs_np_2.0', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.shap_only_ev | C.not_precomputed_datasets_conf,
+
+    dict(experiment_id='oc_fbs_np_1.0', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.claim_only_explainer | C.not_precomputed_datasets_conf,
+
+    # time scalability
+    dict(experiment_id='fbs_time_1.0', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.lime_only_ev | C.feverous_ds_100,
+
 ]
+
 
 def get_config_by_id(experiment_id, config_file_path=None):
     """
