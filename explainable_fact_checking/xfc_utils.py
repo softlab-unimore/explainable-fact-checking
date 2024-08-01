@@ -6,6 +6,12 @@ import sys
 import numpy as np
 import scipy.stats as st
 
+
+class C: #general costants
+    KEYS_TEXT = 'list_keys_and_text_in_order'
+    TXT_TO_USE = 'input_txt_to_use'
+
+
 class_names = ['NEI', 'SUPPORTS', 'REFUTES']
 class_names_load = ['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES']
 
@@ -33,46 +39,6 @@ def mean_confidence_interval(data, confidence=0.95):
     return (max - min)
 
 
-# class to read jsonl files and predict the labels with the feverous model then takes the value of 'input_txt_to_use' for each prediction and add it to the record and save the new file
-class AddInputTxtToUse:
-    """
-        This class provides a static method to predict and save the results using a given model.
-
-        Methods
-        -------
-        predict_and_save(input_file: str, output_file: str, model: object)
-            Predicts the labels for the records in the input file using the provided model and saves the results in the output file.
-        """
-
-    @staticmethod
-    def predict_and_save(input_file, output_file, model):
-        """
-        Predicts the labels for the records in the input file using the provided model and saves the results in the output file.
-
-        Parameters
-        ----------
-        input_file : str
-            The path to the input file. The file should be in JSONL format, with each line being a separate JSON object representing a record.
-        output_file : str
-            The path to the output file where the results will be saved. The results are saved in JSONL format, with each line being a separate JSON object representing a record with the added 'input_txt_to_use' and 'claim' fields.
-        model : object
-            The model used for prediction. The model should have a 'predict' method that takes a list of records and returns a list of predictions. It should also have a 'predictions' attribute that stores the full predictions data.
-
-        Returns
-        -------
-        None
-        """
-        with open(input_file, 'r') as f_in:
-            record_list = [json.loads(line) for line in f_in]
-            predictions = model.predict_legacy(record_list)
-            full_predictions = model.predictions
-            for i, pred in enumerate(full_predictions):
-                record_list[i]['input_txt_to_use'] = pred['input_txt_model']
-                record_list[i]['claim'] = pred['claim']
-        with open(output_file, 'w') as f_out:
-            for record in record_list:
-                f_out.write(json.dumps(record) + '\n')
-
 
 def save_prediciton_only_claim(input_file, output_file, model):
     """
@@ -96,12 +62,12 @@ def save_prediciton_only_claim(input_file, output_file, model):
         for record in record_list:
             record['evidence'] = []
             # delete the input_txt_to_use field if present
-            if 'input_txt_to_use' in record:
-                del record['input_txt_to_use']
+            if C.TXT_TO_USE in record:
+                del record[C.TXT_TO_USE]
         predictions = model.predict(record_list)
         full_predictions = model.predictions
         for record, pred in zip(record_list, full_predictions):
-            record['input_txt_to_use'] = pred['input_txt_model']
+            record[C.TXT_TO_USE] = pred['input_txt_model']
             record['claim'] = pred['claim']
             t = 'predicted_scores'
             record[t] = pred[t]
@@ -138,11 +104,10 @@ def map_evidence_types(records):
                     # evidence_types.append('cell')
                     # raise ValueError('Evidence type not recognized.')
 
-
         # assert len(np.nunique(evidence_types)) == len(record['evidence']), f'Number of unique evidence types {np.nunique(evidence_types)} different from number of evidence dictionary {len(record["evidence"])}'
-        if 'input_txt_to_use' in record:
-            ev_list = record['input_txt_to_use'].split(' </s> ')
-            n_ev = len(ev_list) -1
+        if C.TXT_TO_USE in record:
+            ev_list = record[C.TXT_TO_USE].split(' </s> ')
+            n_ev = len(ev_list) - 1
             # assert n_ev == len(evidence_types), f'Number of evidence types {len(evidence_types)} different from number of evidence {n_ev}'
         out_dict[id] = evidence_types
     return out_dict
@@ -182,6 +147,7 @@ def init_logger(save_dir: str) -> logging.Logger:
 
     return logger
 
+
 def handle_exception(e, logger):
     """
     Handle an exception by logging it and raising it again if the code is being debugged.
@@ -204,6 +170,7 @@ def handle_exception(e, logger):
     elif gettrace():
         raise e
 
+
 class GeneralFactory:
     def __init__(self):
         self._creators = {}
@@ -213,6 +180,7 @@ class GeneralFactory:
 
     def create(self, name, **kwargs):
         if name not in self._creators:
-            raise ValueError(f'The name specified ({name}) is not registered. Valid options are {self._creators.keys()}')
+            raise ValueError(
+                f'The name specified ({name}) is not registered. Valid options are {self._creators.keys()}')
         creator = self._creators[name]
         return creator(**kwargs)

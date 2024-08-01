@@ -329,3 +329,5 @@ cython_debug/
 /AB/
 /trash/
 /datasets/
+/tests/exp_presentation.html
+/tests/tmp.py
