@@ -115,9 +115,10 @@ class ExperimentRunner:
                                       explainer_params=explainer_params)
         with open(os.path.join(results_dir, 'params.json'), 'w') as f:
             json.dump(base_experiment_params, f)
-
+        for t_params in [model_params, explainer_params, dataset_params]:
+            t_params['random_seed'] = t_params.get('random_seed', random_seed)
         dataset = xfc.datasets_loaders.dataset_loader_factory.create(dataset_name, **dataset_params)
-        model = xfc.models.model_factory.create(model_name, random_state=random_seed, **model_params)
+        model = xfc.models.model_factory.create(model_name, **model_params)
         explainer = xfc.explainers.explainer_factory.create(explainer_name, **explainer_params)
         exp_list = []
         if hasattr(explainer, 'explain_list'):
@@ -159,9 +160,14 @@ experiment_done = [
     'f_bs_1.1b',
     'f_bs_1.1c',
 
+
+    # after submission EMNLP
+    'fbs_np_1.0',
 ]
 
 experiments_doing = [
+    'fbs_np_2.0',
+    'oc_fbs_np_1.0',
 
 ]
 

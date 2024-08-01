@@ -10,7 +10,7 @@ import sys
 # sys.path.append('/homes/bussotti/feverous_work/feverousdata')
 # sys.path.append('/homes/bussotti/feverous_work/feverousdata/feverous')
 
-from feverous.baseline.predictor.evaluate_verdict_predictor import main2
+from feverous.baseline.predictor.evaluate_verdict_predictor5 import main2
 
 from explainable_fact_checking.adapters import predictor_universal_ABC as predictor_universal
 
@@ -135,7 +135,6 @@ def short_prediction_feverous(records, db_path_test, model_path='models_fromjf27
     main2(intermediate_file_path, model_path, db_path_test)
     with open(intermediate_file_path.replace('.jsonl', '.verdict.jsonl'), 'r') as f:
         obj = []
-
         for line in f:
             obj += [json.loads(line)]
 
@@ -159,12 +158,12 @@ class FeverousModelAdapter:
 
     """
 
-    def __init__(self, model_path, random_state=None):
+    def __init__(self, model_path, random_seed=None):
         self.base_path = '/homes/bussotti/feverous_work/feverousdata/'
         self.tmp_file = 'AB/tmp/tmp_records.jsonl'
         self.tmp_pred_file = 'AB/tmp/tmp_predictions'
         self.model_path = model_path
-        self.set_random_state(random_state)
+        self.set_random_state(random_seed)
 
     def set_random_state(self, random_seed):
         self.random_seed = random_seed
