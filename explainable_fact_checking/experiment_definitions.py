@@ -1,5 +1,8 @@
 import os
 import sys
+
+import numpy as np
+
 import explainable_fact_checking as xfc
 
 
@@ -59,9 +62,21 @@ class C:
                         explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[500], ),
                         )
 
+
     shap_only_ev = dict(explainer_name=['shap'],
                         explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
                                               num_samples=[500], ),
+                        )
+    n_perturb_time = [int(x) for x in (2 ** np.arange(5,13+1))]
+    lime_only_ev_time = dict(explainer_name=['lime'],
+                             explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=n_perturb_time, ),
+                             )
+    lime_only_ev_time_v2_s = dict(explainer_name=['lime'],
+                             explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=n_perturb_time[:3], ),
+                             )
+    shap_only_ev_time = dict(explainer_name=['shap'],
+                        explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
+                                              num_samples=n_perturb_time, ),
                         )
 
     claim_only_explainer = dict(explainer_name=['claim_only_pred'], explainer_params=dict(), )
@@ -156,7 +171,15 @@ experiment_definitions_list = [
 
     # time scalability
     dict(experiment_id='fbs_time_1.0', ) | C.BASE_CONFIG |
-    C.baseline_feverous_model | C.lime_only_ev | C.feverous_ds_100,
+    C.baseline_feverous_model | C.lime_only_ev_time | C.feverous_ds_100,
+
+    dict(experiment_id='fbs_time_2.0', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.shap_only_ev_time | C.feverous_ds_100,
+
+    dict(experiment_id='fbs_time_1.1', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.lime_only_ev_time_v2_s | C.feverous_ds_100,
+    # after having the results of the time experiment
+    # define the best number of samples experiment with less combinations of num_samples.
 
 ]
 

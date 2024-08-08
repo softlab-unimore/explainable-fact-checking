@@ -160,21 +160,22 @@ experiment_done = [
     'f_bs_1.1b',
     'f_bs_1.1c',
 
-
     # after submission EMNLP
     'fbs_np_1.0',
-]
-
-experiments_doing = [
     'fbs_np_2.0',
     'oc_fbs_np_1.0',
 
+    'fbs_time_2.0',
+    'fbs_time_1.0',
+]
+
+experiments_doing = [
 ]
 
 # main thing to start the experiment
 if __name__ == "__main__":
 
-    experiments_to_run = [
+    experiments_to_run = ['fbs_time_1.1',
     ]
 
     experiment_runner = ExperimentRunner()
