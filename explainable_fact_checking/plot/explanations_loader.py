@@ -79,7 +79,7 @@ def explanations_to_df(explanation_object_list: list):
                     tdict[key] = value
             tdict['dataset_file_name'] = tdict.pop('dataset_file')
             texp_list = explanation_to_dict_olap(explanation)
-            out_list += [tdict | x for x in texp_list]
+            out_list += [x | tdict  for x in texp_list]
     ret_df = pd.DataFrame(out_list)
     # convert the following columns in categorical ['type', 'dataset_file_name', 'model_path', 'model_name', 'perturbation_mode', 'mode']
     for col in ['type', 'dataset_file_name', 'model_path', 'model_name', 'perturbation_mode', 'mode']:
@@ -101,11 +101,15 @@ def explanation_to_dict_olap(exp):
         get_method = lambda x: exp.get(x, None)
     else:
         get_method = lambda x: getattr(exp, x) if hasattr(exp, x) else None
-    assert get_method('record').get('noisetag') is None or len(get_method('record')['noisetag']) == len(get_method('local_exp')[0])
+    assert get_method('record') is None or get_method('record').get('noisetag') is None or len(
+        get_method('record')['noisetag']) == len(get_method('local_exp')[0])
     ret_list = []
     out_dict = {}
+    # get available attributes of exp
     for key in ['num_samples', 'label', 'execution_time', 'id']:
         out_dict[key] = get_method(key)
+    if params_to_report := get_method('params_to_report'):
+        out_dict |= params_to_report
     # out_dict['local_pred'] = exp.local_pred[0]
     if 'label' not in out_dict and get_method('record') is not None:
         out_dict['label'] = get_method('record')['label']
@@ -198,78 +202,6 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
     return pd.DataFrame(out_list)
 
 
-def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list: list):
-    exp_object_list = []
-    for experiment_code in experiment_code_list:
-        x = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
-        exp_object_list += x
-
-    only_claim_list = []
-    for experiment_code in only_claim_exp_list:
-        only_claim = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
-        only_claim_list += only_claim
-
-    explanation_df = explanations_to_df(exp_object_list)
-    only_claim_predictions_df = explanations_to_df(only_claim_list)
-    only_claim_predictions_df['type'] = 'only_claim'
-
-    # files_dict = load_explanations_lime(dir='/home/bussotti/XFCresults/lime_explanations')
-    # explanation_df = explanations_to_df_lime(files_dict)
-
-    id_cols = ['dataset_file_name', 'id', 'model_path']
-
-    index_exp = explanation_df[id_cols]
-    class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names_load]
-
-    only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
-    common_index = pd.MultiIndex.from_frame(index_exp).intersection(
-        only_claim_predictions_df.index)
-    only_claim_predictions_df = only_claim_predictions_df.loc[common_index].reset_index().drop(columns=class_pred_cols)
-    mask = explanation_df['type'] == 'claim_intercept'
-    only_claim_predictions_df = only_claim_predictions_df.merge(explanation_df.loc[mask, id_cols + class_pred_cols],
-                                                                on=id_cols)
-
-    all_df = pd.concat([explanation_df, only_claim_predictions_df], ignore_index=True)
-
-    # all_df = explanation_df
-    # sort all_df by dataset_file_name and id
-    all_df.sort_values(by=id_cols, inplace=True)
-
-    all_df['predicted_label'] = all_df[class_pred_cols].idxmax(axis=1).str.replace('_predict_proba', '')
-    for tclass in xfc.xfc_utils.class_names_load:
-        tmask = all_df['predicted_label'] == tclass
-        all_df.loc[tmask, 'score_on_predicted_label'] = all_df.loc[tmask, tclass]
-
-    # take last part of model_path as model_name
-    all_df['model_id'] = all_df['model_path'].apply(lambda x: x.split('/')[-1])
-    # save the explanations to a csv file
-    # correction of label. Load dataset files by adding '_orig.jsonl' and replace the label with the one in the original file
-    # load the original dataset files
-    for dataset_file_name in all_df['dataset_file_name'].unique():
-        dataset_file_name_orig = dataset_file_name.replace('.jsonl', '_orig.jsonl')
-        tpath = os.path.join(xfc.experiment_definitions.C.DATASET_DIR_FEVEROUS[0], dataset_file_name_orig)
-        if not os.path.exists(tpath):
-            continue
-        with open(tpath, 'r') as f:
-            orig_records = [json.loads(x) for x in f]
-        orig_records_dict = {x['id']: x for x in orig_records}
-        mask = all_df['dataset_file_name'] == dataset_file_name
-        all_df.loc[mask, 'label'] = all_df.loc[mask, 'id'].apply(lambda x: orig_records_dict[x]['label'])
-
-    all_df.to_csv(os.path.join(xfc.experiment_definitions.C.RESULTS_DIR, 'all_exp.csv'), index=False)
-
-    # assert (pd.Series(only_claim_predictions_df[id_cols].astype(str).apply('_'.join, 1).unique()).isin(explanation_df[
-    #                                                                                                        id_cols].astype(
-    #     str).apply('_'.join, 1).unique())).all(), \
-    #     'Different (id, dataset_file_name) in explanations and only_claim_predictions'
-    # assert explanation_df[class_pred_cols].astype(str).apply('_'.join, 1).groupby(
-    #     explanation_df[id_cols].astype(str).apply('_'.join, 1)).nunique().max() == 1, \
-    #     'Multiple predict_proba for the same (id, dataset_file_name)'
-    #
-    # for dataset_file_name, explanation_dict in files_dict.items():
-    #     print(f'File: {dataset_file_name}')
-    #     print(f'Number of explanations: {len(explanation_dict)}')
-
 
 def load_experiment_result_by_code(experiment_code, results_path) -> list:
     """
@@ -299,23 +231,99 @@ def load_experiment_result_by_code(experiment_code, results_path) -> list:
     return results_list
 
 
+def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list: list = [], save_name=None):
+    exp_object_list = []
+    for experiment_code in experiment_code_list:
+        x = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
+        exp_object_list += x
+    explanation_df = explanations_to_df(exp_object_list)
+    id_cols = ['dataset_file_name', 'id', 'model_path']
+    class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names_load]
+    index_exp = explanation_df[id_cols]
+
+    if only_claim_exp_list:
+        only_claim_list = []
+        for experiment_code in only_claim_exp_list:
+            only_claim = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
+            only_claim_list += only_claim
+
+        only_claim_predictions_df = explanations_to_df(only_claim_list)
+        only_claim_predictions_df['type'] = 'only_claim'
+
+
+        only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
+        common_index = pd.MultiIndex.from_frame(index_exp).intersection(
+            only_claim_predictions_df.index)
+        only_claim_predictions_df = only_claim_predictions_df.loc[common_index].reset_index().drop(
+            columns=class_pred_cols)
+        mask = explanation_df['type'] == 'claim_intercept'
+        only_claim_predictions_df = only_claim_predictions_df.merge(explanation_df.loc[mask, id_cols + class_pred_cols],
+                                                                    on=id_cols)
+        all_df = pd.concat([explanation_df, only_claim_predictions_df], ignore_index=True)
+    else:
+        all_df = explanation_df
+
+    # sort all_df by dataset_file_name and id
+    all_df.sort_values(by=id_cols, inplace=True)
+
+    all_df['predicted_label'] = all_df[class_pred_cols].idxmax(axis=1).str.replace('_predict_proba', '')
+    for tclass in xfc.xfc_utils.class_names_load:
+        tmask = all_df['predicted_label'] == tclass
+        all_df.loc[tmask, 'score_on_predicted_label'] = all_df.loc[tmask, tclass]
+
+    # take last part of model_path as model_name
+    all_df['model_id'] = all_df['model_path'].apply(lambda x: x.split('/')[-1])
+    # save the explanations to a csv file
+    # correction of label. Load dataset files by adding '_orig.jsonl' and replace the label with the one in the original file
+    # load the original dataset files
+    for dataset_file_name in all_df['dataset_file_name'].unique():
+        dataset_file_name_orig = dataset_file_name.replace('.jsonl', '_orig.jsonl')
+        tpath = os.path.join(xfc.experiment_definitions.C.DATASET_DIR_FEVEROUS[0], dataset_file_name_orig)
+        if not os.path.exists(tpath):
+            continue
+        with open(tpath, 'r') as f:
+            orig_records = [json.loads(x) for x in f]
+        orig_records_dict = {x['id']: x for x in orig_records}
+        mask = all_df['dataset_file_name'] == dataset_file_name
+        all_df.loc[mask, 'label'] = all_df.loc[mask, 'id'].apply(lambda x: orig_records_dict[x]['label'])
+
+    if save_name:
+        all_df.to_csv(os.path.join(xfc.experiment_definitions.C.RESULTS_DIR, save_name), index=False)
+
+    # assert (pd.Series(only_claim_predictions_df[id_cols].astype(str).apply('_'.join, 1).unique()).isin(explanation_df[
+    #                                                                                                        id_cols].astype(
+    #     str).apply('_'.join, 1).unique())).all(), \
+    #     'Different (id, dataset_file_name) in explanations and only_claim_predictions'
+    # assert explanation_df[class_pred_cols].astype(str).apply('_'.join, 1).groupby(
+    #     explanation_df[id_cols].astype(str).apply('_'.join, 1)).nunique().max() == 1, \
+    #     'Multiple predict_proba for the same (id, dataset_file_name)'
+    #
+    # for dataset_file_name, explanation_dict in files_dict.items():
+    #     print(f'File: {dataset_file_name}')
+    #     print(f'Number of explanations: {len(explanation_dict)}')
+
+    return all_df
+
+
+
 if __name__ == '__main__':
-    load_preprocess_explanations(
-        experiment_code_list=[
-            'sk_f_jf_1.1',
-            'sk_f_jf_1.0',
-            'sk_f_jf_1.1b',
-            'sk_f_jf_1.1n',
-            'f_bs_1.0',
-            'f_bs_1.1',
-            'f_bs_1.1b',
-            'f_bs_1.1c',
-            'fbs_np_1.0',
-            'fbs_np_2.0',
-        ],
-        only_claim_exp_list=[
-            'oc_1.0',
-            'oc_1.1',
-            'oc_fbs_np_1.0',
-        ]
-    )
+    df = load_preprocess_explanations(experiment_code_list=[
+        'fbs_time_1.1',
+    ])
+    load_preprocess_explanations(experiment_code_list=[
+        'sk_f_jf_1.1',
+        'sk_f_jf_1.0',
+        'sk_f_jf_1.1b',
+        'sk_f_jf_1.1n',
+        'f_bs_1.0',
+        'f_bs_1.1',
+        'f_bs_1.1b',
+        'f_bs_1.1c',
+        'fbs_np_1.0',
+        'fbs_np_2.0',
+    ], only_claim_exp_list=[
+        'oc_1.0',
+        'oc_1.1',
+        'oc_fbs_np_1.0',
+    ], save_name='all_exp.csv')
+
