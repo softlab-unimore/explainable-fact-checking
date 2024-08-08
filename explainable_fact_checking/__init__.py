@@ -8,6 +8,7 @@ from . import datasets_loaders
 from . import explainers
 from . import wrappers
 from . import plot
+from .plot.explanations_loader import load_preprocess_explanations
 
 
 
