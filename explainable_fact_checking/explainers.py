@@ -27,6 +27,7 @@ class LimeXFCAdapter:
         xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True,
                                                          perturbation_mode=self.perturbation_mode)
 
+        start_time = datetime.now()
         explainer = LimeTextExplainer(
             split_expression=xfc_wrapper.tokenizer,
             # Order matters, and we cannot use bag of words.
@@ -50,9 +51,11 @@ class LimeXFCAdapter:
         exp.id = xfc_wrapper.get_id()
         exp.label = record['label']
         exp.record = record
-        exp.execution_time = (b - a).total_seconds()
+        exp.execution_time = (b - start_time).total_seconds()
         exp.params_to_report = xfc_wrapper.params_to_report
+        exp.explanation_time = (b - a).total_seconds()
         return exp
+
 
 class ShapXFCAdapter:
     def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42):
@@ -71,11 +74,13 @@ class ShapXFCAdapter:
         evidence_array = xfc_wrapper.get_evidence_list_SHAP()
         # set numpy random state
         np.random.seed(self.random_seed)
+        start_time = datetime.now()
         if self.mode == 'KernelExplainer':
             explainer = shap.KernelExplainer(model=xfc_wrapper, data=np.ones((1, evidence_array.shape[1])) * -1)
             # explainer = shap.KernelExplainer(model=xfc_wrapper,
             #                                  data=np.arange(evidence_array.shape[1]).reshape(1, -1) + 1)
             # time the explanation process
+
             a = datetime.now()
             # exp = explainer.shap_values(
             #     np.zeros(evidence_array.shape),
@@ -101,7 +106,8 @@ class ShapXFCAdapter:
             b = datetime.now()
         else:
             raise ValueError(f"Invalid mode {self.mode}")
-        time_elapsed = (b - a).total_seconds()
+        tot_time = (b - start_time).total_seconds()
+        explanation_time = (b - a).total_seconds()
         # convert the explanation to the same format of LIME
         local_exp = {i: [(j, shap_values[j]) for j in range(len(shap_values))] for i, shap_values in
                      enumerate(exp[0].T)}
@@ -110,20 +116,20 @@ class ShapXFCAdapter:
         domain_mapper = lime.lime_text.TextDomainMapper(indexed_string=indexed_string)
         predict_proba = xfc_wrapper.predict_wrapper(np.ones(evidence_array.shape)).reshape(-1)
         # predict_proba = predictor([record])
-        Explanation(
-            exp,
-            base_values=predict_proba,
-            data=X.to_numpy() if isinstance(X, pd.DataFrame) else X,
-            feature_names=xfc_wrapper.evidence_array,
-            compute_time=time_elapsed,
-        )
+        # Explanation(
+        #     exp,
+        #     base_values=predict_proba,
+        #     data=X.to_numpy() if isinstance(X, pd.DataFrame) else X,
+        #     feature_names=xfc_wrapper.evidence_array,
+        #     compute_time=tot_time,
+        # )
         exp_dict = dict(
             local_exp=local_exp,
             claim=xfc_wrapper.claim,
             id=xfc_wrapper.get_id(),
             label=record['label'],
             record=record,
-            execution_time=time_elapsed,
+            execution_time=explanation_time,
             predict_proba=predict_proba,
             domain_mapper=domain_mapper,
             random_seed=self.random_seed,
@@ -131,6 +137,7 @@ class ShapXFCAdapter:
             mode=self.mode,
             intercept=predict_proba - np.sum(exp[0], axis=0),
             params_to_report=xfc_wrapper.params_to_report,
+            explanation_time=explanation_time,
         )
         return exp_dict
 
