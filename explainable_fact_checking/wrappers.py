@@ -59,7 +59,6 @@ class FeverousRecordWrapper:
         "input_txt_to_use": "Aramais Yepiskoposyan played for FC Ararat Yerevan, an Armenian football club based in Yerevan during 1986 to 1991. </s> Aramais Yepiskoposyan </s> 1986\u20131991 is [[FC_Ararat_Yerevan|FC Ararat Yerevan]]. </s> Senior career* is [[FC_Ararat_Yerevan|FC Ararat Yerevan]]. </s>  Football Club Ararat Yerevan ([[Armenian_language|Armenian]]: \u0556\u0578\u0582\u057f\u0562\u0578\u056c\u0561\u0575\u056b\u0576 \u0531\u056f\u0578\u0582\u0574\u0562 \u0531\u0580\u0561\u0580\u0561\u057f \u0535\u0580\u0587\u0561\u0576), commonly known as Ararat Yerevan, is an Armenian [[Association_football|football]] club based in [[Yerevan|Yerevan]] that plays in the Armenian Premier League."}
     evidence_separator = r' </s> '
     reference_record = {}
-    params_to_report = {}
 
     def __init__(self, record, predictor, separator=r' </s> ', perturbation_mode='only_evidence', explainer='lime',
                  debug=False):
@@ -69,6 +68,7 @@ class FeverousRecordWrapper:
         self.claim = None
         self.mode = 'normal'
         self.restructure_perturbed_records = self.restructure_perturbed_records_codes
+        self.params_to_report = {}
         if 'claim' in record and 'input_txt_to_use' in record:
             assert record['claim'] == record['input_txt_to_use'].split(separator)[
                 0], 'Claim and input_txt_to_use do not match'
@@ -123,7 +123,10 @@ class FeverousRecordWrapper:
     def predict_wrapper(self, perturbed_evidence_string_list):
         restructured_records = self.restructure_perturbed_records(perturbed_evidence_string_list)
         predictions = self.predict_method(restructured_records)
-        self.params_to_report |= dict(effective_num_samples=len(restructured_records))
+        n_samples = len(restructured_records)
+        self.params_to_report |= dict( #effective_num_samples=n_samples,
+                                      total_predictions=self.params_to_report.get('total_predictions', 0) + n_samples,
+                                      )
         if self.debug:
             self.debug_data['perturbed_evidence_string_list'] = perturbed_evidence_string_list
             self.debug_data['restructured_records'] = restructured_records
@@ -198,5 +201,3 @@ class FeverousRecordWrapper:
     @staticmethod
     def set_evidence_content(record, content):
         record['evidence'][0]['content'] = content
-
-

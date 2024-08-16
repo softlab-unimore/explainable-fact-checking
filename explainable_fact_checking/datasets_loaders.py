@@ -1,9 +1,16 @@
 import json
 import os
+from urllib.request import urlretrieve
+
+import pandas as pd
 
 import explainable_fact_checking as xfc
 import explainable_fact_checking.xfc_utils
 from explainable_fact_checking import FeverousModelAdapter, C
+
+
+# Create an instance of the factory
+dataset_loader_factory = explainable_fact_checking.xfc_utils.GeneralFactory()
 
 
 def feverous_loader(dataset_dir, dataset_file, top=None, **kwargs):
@@ -26,38 +33,42 @@ def feverous_loader(dataset_dir, dataset_file, top=None, **kwargs):
     return data
 
 
-# dataset_loader_dict = {
-#     'feverous': feverous_loader,
-# }
-#
-#
-# def get_dataset(dataset_name, **kwargs):
-#     loader = dataset_loader_dict.get(dataset_name, None)
-#     if loader is None:
-#         raise ValueError(
-#             f'The dataset specified ({dataset_name}) is not allowed. Valid options are {dataset_loader_dict.keys()}')
-#     return loader(**kwargs)
-#
-# class DatasetLoaderFactory:
-#     def __init__(self):
-#         self._loaders = {}
-#
-#     def register_loader(self, dataset_name, loader_function):
-#         self._loaders[dataset_name] = loader_function
-#
-#     def get_dataset(self, dataset_name, **kwargs):
-#         loader = self._loaders.get(dataset_name)
-#         if loader is None:
-#             raise ValueError(
-#                 f'The dataset specified ({dataset_name}) is not allowed. Valid options are {self._loaders.keys()}')
-#         return loader(**kwargs)
-
-
-# Create an instance of the factory
-dataset_loader_factory = explainable_fact_checking.xfc_utils.GeneralFactory()
-
 # Register the loaders
 dataset_loader_factory.register_creator('feverous', feverous_loader)
+
+class PolitihopDatasetLoader:
+
+    file_names = ['politihop_train.tsv', 'politihop_valid.tsv', 'politihop_test.tsv']
+
+    @staticmethod
+    def download_politihop(dest_dir):
+        '''
+        https://github.com/copenlu/politihop/tree/master
+        '''
+        base_link = 'https://github.com/copenlu/politihop/blob/master/data/'
+        os.makedirs(dest_dir, exist_ok=True)
+        for file_name in PolitihopDatasetLoader.file_names:
+            url = base_link + file_name + '?raw=true'
+            # download file using python library urllib
+            urlretrieve(url, os.path.join(dest_dir, file_name))
+
+    @staticmethod
+    def politihop_loader(dataset_dir, dataset_file, top=None, **kwargs):
+        data = []
+        input_file = os.path.join(dataset_dir, dataset_file)
+        #if datest file not in file_names raise error
+        if dataset_file not in PolitihopDatasetLoader.file_names:
+            raise ValueError(f"Dataset file should be one of {PolitihopDatasetLoader.file_names}.")
+        # if file does not exist, download it
+        if not os.path.exists(input_file):
+            PolitihopDatasetLoader.download_politihop(dataset_dir)
+
+        # load dataframe from tsv
+        df = pd.read_csv(input_file, sep='\t')
+        return df
+
+
+dataset_loader_factory.register_creator('politihop', PolitihopDatasetLoader.politihop_loader)
 
 
 class AddInputTxtToUse:
@@ -87,14 +98,12 @@ class AddInputTxtToUse:
                 return input_file
             output_file = input_file.replace('.jsonl', '_plus.jsonl')
             if C.KEYS_TEXT in row:
-                AddInputTxtToUse.generate_txt_from_list_keys(input_file, output_file=output_file,)
+                AddInputTxtToUse.generate_txt_from_list_keys(input_file, output_file=output_file, )
             else:
                 xfc.xfc_utils.AddInputTxtToUse.by_model_legacy_prediction(input_file=input_file,
                                                                           output_file=output_file,
                                                                           )
             return output_file
-
-
 
     @staticmethod
     def generate_txt_from_list_keys(input_file, output_file):
@@ -125,8 +134,6 @@ class AddInputTxtToUse:
                     os.remove(output_file)
                 raise e
 
-
-
     @staticmethod
     def by_model_legacy_prediction(input_file, output_file, ):
         """
@@ -156,3 +163,4 @@ class AddInputTxtToUse:
         with open(output_file, 'w') as f_out:
             for record in record_list:
                 f_out.write(json.dumps(record) + '\n')
+
