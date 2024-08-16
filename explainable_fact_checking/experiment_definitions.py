@@ -13,6 +13,8 @@ class C:
     RESULTS_DIR = '/home/bussotti/XFCresults/experiments'
     PLOT_DIR = '/home/bussotti/XFCresults/plots'
     DATASET_DIR_FEVEROUS = ['/home/bussotti/XFCresults/']
+    DATASET_DIR = ['/home/bussotti/XFCresults/datasets']
+    POLITIHOP_DS_DIR = ['/home/bussotti/XFCresults/datasets/politihop']
     BASE_CONFIG = dict(results_dir=RESULTS_DIR, random_seed=[1], )
     feverous_datasets_conf = dict(dataset_name='feverous',
                                   dataset_params=dict(
@@ -37,6 +39,14 @@ class C:
                                ],
                                top=[100]),
                            )
+    politihop_10_test = dict(dataset_name='politihop',
+                             dataset_params=dict(
+                                 dataset_dir=POLITIHOP_DS_DIR,
+                                 dataset_file=[
+                                     'politihop_test.tsv',
+                                 ],
+                                 top=[10]),
+                             )
     not_precomputed_datasets_conf = dict(dataset_name='feverous',
                                          dataset_params=dict(
                                              dataset_dir=['/home/bussotti/XFCresults/datasets'],
@@ -62,23 +72,30 @@ class C:
                         explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[500], ),
                         )
 
+    lime_only_ev_50 = dict(explainer_name=['lime'],
+                           explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[50], ),
+                           )
 
     shap_only_ev = dict(explainer_name=['shap'],
                         explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
                                               num_samples=[500], ),
                         )
-    n_perturb_time = [int(x) for x in (2 ** np.arange(5,13+1))]
+    n_perturb_time = [int(x) for x in (2 ** np.arange(5, 13 + 1))]
     lime_only_ev_time = dict(explainer_name=['lime'],
                              explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=n_perturb_time, ),
                              )
     lime_only_ev_time_v2_s = dict(explainer_name=['lime'],
-                             explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=n_perturb_time[:3], ),
-                             )
+                                  explainer_params=dict(perturbation_mode=['only_evidence'],
+                                                        num_samples=n_perturb_time[:3], ),
+                                  )
     shap_only_ev_time = dict(explainer_name=['shap'],
-                        explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
-                                              num_samples=n_perturb_time, ),
-                        )
-
+                             explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
+                                                   num_samples=n_perturb_time, ),
+                             )
+    shap_only_ev_time_v2_s = dict(explainer_name=['shap'],
+                                  explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
+                                                        num_samples=n_perturb_time[:3], ),
+                                  )
     claim_only_explainer = dict(explainer_name=['claim_only_pred'], explainer_params=dict(), )
 
 
@@ -178,8 +195,17 @@ experiment_definitions_list = [
 
     dict(experiment_id='fbs_time_1.1', ) | C.BASE_CONFIG |
     C.baseline_feverous_model | C.lime_only_ev_time_v2_s | C.feverous_ds_100,
+
+    dict(experiment_id='fbs_time_2.1', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.shap_only_ev_time_v2_s | C.feverous_ds_100,
+
+    dict(experiment_id='fbs_time_2.1test', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.shap_only_ev_time_v2_s | C.feverous_ds_100,
     # after having the results of the time experiment
     # define the best number of samples experiment with less combinations of num_samples.
+
+    dict(experiment_id='sms_p_1.0', ) | C.BASE_CONFIG |
+    C.baseline_feverous_model | C.lime_only_ev_50 | C.politihop_10_test,
 
 ]
 
