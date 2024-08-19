@@ -7,12 +7,12 @@ import numpy as np
 
 import sys
 
-# sys.path.append('/homes/bussotti/feverous_work/feverousdata')
-# sys.path.append('/homes/bussotti/feverous_work/feverousdata/feverous')
+sys.path.append('/homes/bussotti/feverous_work/feverousdata')
+sys.path.append('/homes/bussotti/feverous_work/feverousdata/feverous')
 
 from feverous.baseline.predictor.evaluate_verdict_predictor5 import main2
 
-from explainable_fact_checking.adapters import predictor_universal_ABC as predictor_universal
+from explainable_fact_checking.model_adapters import predictor_universal_ABC as predictor_universal
 
 
 def run_exp_multitest(exp_folder, dest_folder, train_db, train_dev_file, dev_db, dev_testfile, suffix,

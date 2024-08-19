@@ -2,7 +2,7 @@ from . import xfc_utils
 from .xfc_utils import C
 from . import experiment_definitions
 from .explanation_presentation import style_exp_to_html, style_single_exp_list
-from .adapters.feverous_model import FeverousModelAdapter
+from .model_adapters.feverous_model import FeverousModelAdapter
 from . import models
 from . import datasets_loaders
 from . import explainers
