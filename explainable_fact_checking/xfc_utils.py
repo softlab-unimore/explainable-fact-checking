@@ -7,9 +7,13 @@ import numpy as np
 import scipy.stats as st
 
 
-class C: #general costants
+class C:  # general costants
     KEYS_TEXT = 'list_keys_and_text_in_order'
     TXT_TO_USE = 'input_txt_to_use'
+    EV_KEY = 'evidence_list'
+    COLUMNS_MAP = {'article_id': 'id',
+                   'statement': 'claim', 'ruling': EV_KEY,
+                   'annotated_label': 'label'}
 
 
 class_names = ['NEI', 'SUPPORTS', 'REFUTES']
@@ -37,7 +41,6 @@ def mean_confidence_interval(data, confidence=0.95):
     """
     min, max = st.t.interval(confidence, len(data) - 1, loc=np.mean(data), scale=st.sem(data))
     return (max - min)
-
 
 
 def save_prediciton_only_claim(input_file, output_file, model):
