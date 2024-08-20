@@ -1,9 +1,4 @@
-import os
-import sys
-
 import numpy as np
-
-import explainable_fact_checking as xfc
 
 
 class C:
@@ -16,6 +11,8 @@ class C:
     DATASET_DIR = ['/home/bussotti/XFCresults/datasets']
     POLITIHOP_DS_DIR = ['/home/bussotti/XFCresults/datasets/politihop']
     BASE_CONFIG = dict(results_dir=RESULTS_DIR, random_seed=[1], )
+    ROBERTA_V2_3L = '/home/bussotti/experiment_AE/0824_explainer_newmodel/llama318b_feverousobj5trained_10epochs_3labels/adapter_config.json'
+
     feverous_datasets_conf = dict(dataset_name='feverous',
                                   dataset_params=dict(
                                       dataset_dir=DATASET_DIR_FEVEROUS,
@@ -58,6 +55,9 @@ class C:
                                              ],
                                              top=[1000]),
                                          )
+
+    fake_predictor = dict(model_name=['fake_predictor'])
+
     JF_feverous_model = dict(model_name=['default'], model_params=dict(
         model_path=['/homes/bussotti/feverous_work/feverousdata/models_fromjf270623or']), )
 
@@ -66,6 +66,13 @@ class C:
         model_params=dict(
             model_path=[
                 '/homes/bussotti/feverous_work/feverousdata/modeloriginalfeverousforandrea/feverous_verdict_predictor']),
+    )
+
+    roberta_v0 = dict(
+        model_name=['Roberta'],
+        model_params=dict(
+            base_model_name="meta-llama/Meta-Llama-3.1-8B",
+        ),
     )
 
     lime_only_ev = dict(explainer_name=['lime'],
@@ -205,55 +212,13 @@ experiment_definitions_list = [
     # define the best number of samples experiment with less combinations of num_samples.
 
     dict(experiment_id='sms_p_1.0', ) | C.BASE_CONFIG |
-    C.baseline_feverous_model | C.lime_only_ev_50 | C.politihop_10_test,
+    C.fake_predictor |
+    C.lime_only_ev_50
+    # dict(explainer_name=['lime'],
+    #      explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[50], separator=r'<|reserved_special_token_15|>', ),
+    #      )
+    | C.feverous_ds_100
+    # C.politihop_10_test
+    ,
 
 ]
-
-
-def get_config_by_id(experiment_id, config_file_path=None):
-    """
-    Get the configuration dictionary for a specific experiment id.
-
-    This function retrieves the configuration dictionary for a given experiment id.
-    If a configuration file path is provided, the function will import the configuration
-    module from that path and use the experiment definitions from there.
-    Otherwise, it will use the default experiment definitions.
-
-    Parameters
-    ----------
-    experiment_id : str
-        The id of the experiment for which the configuration is to be retrieved.
-    config_file_path : str, optional
-        The path to the configuration file. If not provided, the default experiment definitions will be used.
-
-    Returns
-    -------
-    dict
-        The configuration dictionary for the specified experiment id.
-
-    Raises
-    ------
-    ValueError
-        If the experiment id is not found in the configuration file or if the experiment definitions
-        are not a list or a dictionary.
-    """
-    if config_file_path is not None:
-        config_file_path = os.path.abspath(config_file_path)
-        sys.path.append(os.path.dirname(config_file_path))
-        config_module = __import__(os.path.basename(config_file_path).split('.')[0])
-        experiment_definitions_list = config_module.experiment_definitions_list
-    else:
-        experiment_definitions_list = xfc.experiment_definitions.experiment_definitions_list
-
-    if isinstance(experiment_definitions_list, list):
-        experiment_definitions_dict = {x['experiment_id']: x for x in experiment_definitions_list}
-        # check that there are only unique experiment ids
-        assert len(experiment_definitions_dict) == len(experiment_definitions_list), 'Experiment ids are not unique.'
-    else:
-        raise ValueError('Invalid experiment_definitions type. It must be a list or a dictionary.')
-
-    exp_dict = experiment_definitions_dict.get(experiment_id, None)
-    if exp_dict is None:
-        raise ValueError(f'Experiment id {experiment_id} not found in the configuration file.')
-
-    return exp_dict

@@ -31,8 +31,58 @@ class ExperimentRunner:
         keys = kwargs.keys()
         return [dict(zip(keys, instance)) for instance in itertools.product(*kwargs.values())]
 
+    @staticmethod
+    def get_config_by_id(experiment_id, config_file_path=None):
+        """
+        Get the configuration dictionary for a specific experiment id.
+
+        This function retrieves the configuration dictionary for a given experiment id.
+        If a configuration file path is provided, the function will import the configuration
+        module from that path and use the experiment definitions from there.
+        Otherwise, it will use the default experiment definitions.
+
+        Parameters
+        ----------
+        experiment_id : str
+            The id of the experiment for which the configuration is to be retrieved.
+        config_file_path : str, optional
+            The path to the configuration file. If not provided, the default experiment definitions will be used.
+
+        Returns
+        -------
+        dict
+            The configuration dictionary for the specified experiment id.
+
+        Raises
+        ------
+        ValueError
+            If the experiment id is not found in the configuration file or if the experiment definitions
+            are not a list or a dictionary.
+        """
+        if config_file_path is not None:
+            config_file_path = os.path.abspath(config_file_path)
+            sys.path.append(os.path.dirname(config_file_path))
+            config_module = __import__(os.path.basename(config_file_path).split('.')[0])
+            experiment_definitions_list = config_module.experiment_definitions_list
+        else:
+            experiment_definitions_list = xfc.experiment_definitions.experiment_definitions_list
+
+        if isinstance(experiment_definitions_list, list):
+            experiment_definitions_dict = {x['experiment_id']: x for x in experiment_definitions_list}
+            # check that there are only unique experiment ids
+            assert len(experiment_definitions_dict) == len(
+                experiment_definitions_list), 'Experiment ids are not unique.'
+        else:
+            raise ValueError('Invalid experiment_definitions type. It must be a list or a dictionary.')
+
+        exp_dict = experiment_definitions_dict.get(experiment_id, None)
+        if exp_dict is None:
+            raise ValueError(f'Experiment id {experiment_id} not found in the configuration file.')
+
+        return exp_dict
+
     def launch_experiment_by_id(self, experiment_id: str, config_file_path=None):
-        exp_dict = xfc.experiment_definitions.get_config_by_id(experiment_id, config_file_path)
+        exp_dict = self.get_config_by_id(experiment_id, config_file_path)
         self.launch_experiment_by_config(exp_dict)
 
     def launch_experiment_by_config(self, exp_dict: dict):
@@ -98,9 +148,9 @@ class ExperimentRunner:
         end_time = datetime.now()
         logger.info(f"Experiment {experiment_id} completed in {end_time - start_time}")
 
-    def launch_single_experiment(self, experiment_id, dataset_name, results_dir, random_seed, model_name, model_params,
-                                 explainer_name, dataset_params,
-                                 explainer_params, logger, **kwargs):
+    def launch_single_experiment(self, experiment_id, dataset_name, results_dir, random_seed, model_name,
+                                 logger, explainer_name, dataset_params={}, model_params={},
+                                 explainer_params={}, **kwargs):
         try:
             if os.path.exists(results_dir):
                 shutil.rmtree(results_dir + '.old', ignore_errors=True)
@@ -167,15 +217,20 @@ experiment_done = [
 
     'fbs_time_2.0',
     'fbs_time_1.0',
+
 ]
 
 experiments_doing = [
+
+    'fbs_time_1.1',
+    'fbs_time_2.1',
 ]
 
 # main thing to start the experiment
 if __name__ == "__main__":
 
-    experiments_to_run = ['fbs_time_1.1',
+    experiments_to_run = [
+        'sms_p_1.0',
     ]
 
     experiment_runner = ExperimentRunner()
