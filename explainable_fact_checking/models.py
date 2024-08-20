@@ -2,6 +2,7 @@ import numpy as np
 
 import explainable_fact_checking as xfc
 
+
 # models_dict = {
 #     'default': FeverousModelAdapter,
 # }
@@ -30,20 +31,32 @@ import explainable_fact_checking as xfc
 #     return PersonalizedWrapper(model_name, random_state, **kwargs)
 
 
-# fake predictor function that takes in input a set of list and returns a list of
-# random predictions with shape (len(strings), 1)
-def fake_predictor(restructured_records):
-    # increasing prediction with the length of the evidence
-    # predictions = np.array([len(x['evidence'][0]['content']) for x in restructured_records]).reshape(-1, 1)
-    # predictions = predictions / np.max(predictions)
+class FakePredictor:
+    def __init__(self, random_state=42, **kwargs):
+        self.random_state = random_state
 
-    predictions: np.ndarray = np.random.rand(len(restructured_records), 1)
-    # scale the predictions between 0 and 1
-    predictions = np.concatenate([predictions, 1 - predictions, np.zeros_like(predictions)], axis=1)
-    return predictions
+    # fake predictor function that takes in input a set of list and returns a list of
+    # random predictions with shape (len(strings), 1)
+    @staticmethod
+    def predict(restructured_records):
+        # increasing prediction with the length of the evidence
+        # predictions = np.array([len(x['evidence'][0]['content']) for x in restructured_records]).reshape(-1, 1)
+        # predictions = predictions / np.max(predictions)
+
+        predictions: np.ndarray = np.random.rand(len(restructured_records), 1)
+        # scale the predictions between 0 and 1
+        predictions = np.concatenate([predictions, 1 - predictions, np.zeros_like(predictions)], axis=1)
+        return predictions
+
+    def __call__(self, *args, **kwargs):
+        return self.predict(*args, **kwargs)
 
 # Create an instance of the factory
 model_factory = xfc.xfc_utils.GeneralFactory()
 
 # Register the models
 model_factory.register_creator('default', xfc.FeverousModelAdapter)
+
+model_factory.register_creator('Roberta', xfc.model_adapters.RobertaAdapter)
+
+model_factory.register_creator('fake_predictor', FakePredictor)
