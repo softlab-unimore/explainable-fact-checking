@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 from urllib.request import urlretrieve
@@ -6,107 +7,11 @@ import pandas as pd
 
 import explainable_fact_checking as xfc
 import explainable_fact_checking.xfc_utils
-from explainable_fact_checking import FeverousModelAdapter, C
+from explainable_fact_checking import C
 
 # Create an instance of the factory
 dataset_loader_factory = explainable_fact_checking.xfc_utils.GeneralFactory()
 
-
-def feverous_loader(dataset_dir, dataset_file, top=None, **kwargs):
-    data = []
-    input_file = os.path.join(dataset_dir, dataset_file)
-    input_file = AddInputTxtToUse.check_dataset(input_file)
-
-    early_stop = top is not None
-    with open(input_file, 'r') as file:
-        if early_stop:
-            for i, line in enumerate(file):
-                if i >= top:
-                    break
-                if line != '\n':
-                    data.append(json.loads(line))
-        else:
-            for i, line in enumerate(file):
-                if line != '\n':
-                    data.append(json.loads(line))
-    return data
-
-
-# Register the loaders
-dataset_loader_factory.register_creator('feverous', feverous_loader)
-
-
-class GeneralDatasetLoader:
-    file_names = None
-    base_link = None
-
-    def download(self, dest_dir):
-        '''
-        Download the dataset files from the base link to the destination directory.
-        '''
-        os.makedirs(dest_dir, exist_ok=True)
-        for file_name in self.file_names:
-            url = self.base_link + file_name + '?raw=true'
-            urlretrieve(url, os.path.join(dest_dir, file_name))
-
-    def load(self, dataset_dir, dataset_file, top=None, **kwargs):
-        input_file = os.path.join(dataset_dir, dataset_file)
-        if dataset_file not in self.file_names:
-            raise ValueError(f"Dataset file should be one of {self.file_names}. Got {dataset_file}")
-        if not os.path.exists(input_file):
-            self.download(dataset_dir)
-        # load dataframe from tsv
-        df = pd.read_csv(input_file, sep='\t', nrows=top)
-        return df
-
-
-
-class PolitihopDatasetLoader(GeneralDatasetLoader):
-    '''
-    https://github.com/copenlu/politihop/tree/master
-    '''
-    file_names = ['politihop_train.tsv', 'politihop_valid.tsv', 'politihop_test.tsv']
-    base_link = 'https://github.com/copenlu/politihop/blob/master/data/'
-
-    def convert_to_dict(self, df):
-        '''
-        'article_id' (int) -> id
-            article id corresponding to the id of the claim in the LIAR dataset
-        'statement' (str) -> claim
-            the text of the claim
-        'author' (str) -> SKIP # todo ok?
-            the author of the claim
-        'ruling' (List(str)) -> sentence_list [use .apply(ast.literal_eval) to convert to list]
-            a comma-separated list of the sentences in the Politifact ruling report (this excludes sentences from the summary in the end)
-        'url_sentences' -> SKIP
-            a comma-separated list of ids of the sentences with a corresponding source url(s)
-        'relevant_text_url_sentences' -> SKIP
-            a comma-separated list of ids of the sentences with a corresponding source url(s) that are actually
-            relevant to the selected evidence sentences
-        'politifact_label' categorical  -> SKIP
-            label assigned to the claim by PolitiFact fact-checkiers (https://www.politifact.com/) Truth-o-Meter
-            [True, Mostly True, Half True, Mostly False, False, Pants on Fire]
-        'annotated_evidence' -> SKIP
-            a json dict of the evidence chains (keys) and the sentences that belong to the chain (value, which is a list of sentence ids from the ruling)
-        'annotated_label' categorical [True, False, Half-True] -> label
-            label annotated by annotators of PolitiFact - True, False, Half-True
-        'urls' -> SKIP
-            a comma-separated list of source urls used in the corresponding PolitiFact article
-        'annotated_urls' -> SKIP
-            a json dict mapping sentence ids to the corresponding urls ids. One sentence can have multiple urls
-        '''
-
-        return df.to_dict(orient='records')
-
-dataset_loader_factory.register_creator('politihop', PolitihopDatasetLoader().load)
-
-
-class LIARPlusDatasetLoader(GeneralDatasetLoader):
-    file_names = ['test2.tsv', 'val2.tsv', 'train2.tsv']
-    base_link = 'https://github.com/Tariq60/LIAR-PLUS/tree/master/dataset/tsv'
-
-
-dataset_loader_factory.register_creator('LIARPlus', LIARPlusDatasetLoader().load)
 
 
 class AddInputTxtToUse:
@@ -138,7 +43,7 @@ class AddInputTxtToUse:
             if C.KEYS_TEXT in row:
                 AddInputTxtToUse.generate_txt_from_list_keys(input_file, output_file=output_file, )
             else:
-                xfc.xfc_utils.AddInputTxtToUse.by_model_legacy_prediction(input_file=input_file,
+                AddInputTxtToUse.by_model_legacy_prediction(input_file=input_file,
                                                                           output_file=output_file,
                                                                           )
             return output_file
@@ -201,3 +106,115 @@ class AddInputTxtToUse:
         with open(output_file, 'w') as f_out:
             for record in record_list:
                 f_out.write(json.dumps(record) + '\n')
+
+
+def feverous_loader(dataset_dir, dataset_file, top=None, **kwargs):
+    data = []
+    input_file = os.path.join(dataset_dir, dataset_file)
+    input_file = AddInputTxtToUse.check_dataset(input_file)
+
+    early_stop = top is not None
+    with open(input_file, 'r') as file:
+        if early_stop:
+            for i, line in enumerate(file):
+                if i >= top:
+                    break
+                if line != '\n':
+                    data.append(json.loads(line))
+        else:
+            for i, line in enumerate(file):
+                if line != '\n':
+                    data.append(json.loads(line))
+    return data
+
+
+# Register the loaders
+dataset_loader_factory.register_creator('feverous', feverous_loader)
+
+
+class GeneralDatasetLoader:
+    file_names = None
+    base_link = None
+
+    def download(self, dest_dir):
+        '''
+        Download the dataset files from the base link to the destination directory.
+        '''
+        os.makedirs(dest_dir, exist_ok=True)
+        for file_name in self.file_names:
+            url = self.base_link + file_name + '?raw=true'
+            urlretrieve(url, os.path.join(dest_dir, file_name))
+
+    def load(self, dataset_dir, dataset_file, top=None, **kwargs):
+        input_file = os.path.join(dataset_dir, dataset_file)
+        if dataset_file not in self.file_names:
+            raise ValueError(f"Dataset file should be one of {self.file_names}. Got {dataset_file}")
+        if not os.path.exists(input_file):
+            self.download(dataset_dir)
+        # load dataframe from tsv
+        df = pd.read_csv(input_file, sep="\t", nrows=top)
+        # convert to list of dictionaries
+        return self.convert_to_dict(df)
+
+    def convert_to_dict(self, df):
+        '''
+        Convert the dataframe to a list of dictionaries.
+        '''
+        return df.to_dict(orient='records')
+
+
+
+class PolitihopDatasetLoader(GeneralDatasetLoader):
+    '''
+    https://github.com/copenlu/politihop/tree/master
+    '''
+    file_names = ['politihop_train.tsv', 'politihop_valid.tsv', 'politihop_test.tsv']
+    base_link = 'https://github.com/copenlu/politihop/blob/master/data/'
+
+    def convert_to_dict(self, df):
+        '''
+        'article_id' (int) -> id
+            article id corresponding to the id of the claim in the LIAR dataset
+        'statement' (str) -> claim
+            the text of the claim
+        'author' (str) -> SKIP # todo ok?
+            the author of the claim
+        'ruling' (List(str)) -> evidence_list [use .apply(ast.literal_eval) to convert to list]
+            a comma-separated list of the sentences in the Politifact ruling report (this excludes sentences from the summary in the end)
+        'url_sentences' -> SKIP
+            a comma-separated list of ids of the sentences with a corresponding source url(s)
+        'relevant_text_url_sentences' -> SKIP
+            a comma-separated list of ids of the sentences with a corresponding source url(s) that are actually
+            relevant to the selected evidence sentences
+        'politifact_label' categorical  -> SKIP
+            label assigned to the claim by PolitiFact fact-checkiers (https://www.politifact.com/) Truth-o-Meter
+            [True, Mostly True, Half True, Mostly False, False, Pants on Fire]
+        'annotated_evidence' -> SKIP
+            a json dict of the evidence chains (keys) and the sentences that belong to the chain (value, which is a list of sentence ids from the ruling)
+        'annotated_label' categorical [True, False, Half-True] -> label
+            label annotated by annotators of PolitiFact - True, False, Half-True
+        'urls' -> SKIP
+            a comma-separated list of source urls used in the corresponding PolitiFact article
+        'annotated_urls' -> SKIP
+            a json dict mapping sentence ids to the corresponding urls ids. One sentence can have multiple urls
+        '''
+        # drop columns that are not needed
+        df = df.drop(columns=['author', 'url_sentences', 'relevant_text_url_sentences', 'politifact_label',
+                              'annotated_evidence', 'urls', 'annotated_urls'])
+        # convert ruling to list by applying ast.literal_eval
+        df['ruling'] = df['ruling'].apply(ast.literal_eval)
+        # rename columns
+        df = df.rename(columns=C.COLUMNS_MAP)
+        return df.to_dict(orient='records')
+
+
+dataset_loader_factory.register_creator('politihop', PolitihopDatasetLoader().load)
+
+
+class LIARPlusDatasetLoader(GeneralDatasetLoader):
+    file_names = ['test2.tsv', 'val2.tsv', 'train2.tsv']
+    base_link = 'https://github.com/Tariq60/LIAR-PLUS/tree/master/dataset/tsv'
+
+
+dataset_loader_factory.register_creator('LIARPlus', LIARPlusDatasetLoader().load)
+
