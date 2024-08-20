@@ -15,17 +15,18 @@ import explainable_fact_checking as xfc
 
 
 class LimeXFCAdapter:
-    def __init__(self, perturbation_mode, num_samples=50, random_seed=42):
+    def __init__(self, perturbation_mode, num_samples=50, random_seed=42, wrapper_params={}):
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
+        self.wrapper_params = wrapper_params
 
     def __call__(self, *args, **kwargs):
         return self.explain(*args, **kwargs)
 
     def explain(self, record, predictor):
         xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True,
-                                                         perturbation_mode=self.perturbation_mode)
+                                                         perturbation_mode=self.perturbation_mode, **self.wrapper_params)
 
         start_time = datetime.now()
         explainer = LimeTextExplainer(
@@ -58,11 +59,12 @@ class LimeXFCAdapter:
 
 
 class ShapXFCAdapter:
-    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42):
+    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, wrapper_params={}):
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
         self.mode = mode
+        self.wrapper_params = wrapper_params
 
     def __call__(self, *args, **kwargs):
         return self.explain(*args, **kwargs)
@@ -70,7 +72,7 @@ class ShapXFCAdapter:
     def explain(self, record, predictor):
         xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor=predictor, debug=True,
                                                          perturbation_mode=self.perturbation_mode,
-                                                         explainer='shap')
+                                                         explainer='shap', **self.wrapper_params)
         evidence_array = xfc_wrapper.get_evidence_list_SHAP()
         # set numpy random state
         np.random.seed(self.random_seed)
