@@ -36,13 +36,24 @@ class C:
                                ],
                                top=[100]),
                            )
-    politihop_10_test = dict(dataset_name='politihop',
+    feverous_ds_xs = dict(dataset_name='feverous',
+                          dataset_params=dict(
+                             dataset_dir=DATASET_DIR_FEVEROUS,
+                             dataset_file=[
+                                 'feverous_train_challenges_withnoise.jsonl',
+                                 'original_TO_01_formatted.jsonl',
+                                 'feverous_dev_ST_01.jsonl',
+                                 'feverous_dev_SO_01.jsonl',
+                             ],
+                             top=[3]),
+                          )
+    politihop_xs_test = dict(dataset_name='politihop',
                              dataset_params=dict(
                                  dataset_dir=POLITIHOP_DS_DIR,
                                  dataset_file=[
                                      'politihop_test.tsv',
                                  ],
-                                 top=[10]),
+                                 top=[3]),
                              )
     not_precomputed_datasets_conf = dict(dataset_name='feverous',
                                          dataset_params=dict(
@@ -54,6 +65,18 @@ class C:
                                                  'dev.combined.not_precomputed.p5.s20.t3_readable_train.jsonl',
                                              ],
                                              top=[1000]),
+                                         )
+
+    not_precomputed_datasets_conf_10 = dict(dataset_name='feverous',
+                                         dataset_params=dict(
+                                             dataset_dir=['/home/bussotti/XFCresults/datasets'],
+                                             dataset_file=[
+                                                 'dev.combined.not_precomputed.p5.s5.t3_readable_test.jsonl',
+                                                 'dev.combined.not_precomputed.p5.s5.t3_readable_train.jsonl',
+                                                 'dev.combined.not_precomputed.p5.s20.t3_readable_test.jsonl',
+                                                 'dev.combined.not_precomputed.p5.s20.t3_readable_train.jsonl',
+                                             ],
+                                             top=[10]),
                                          )
 
     fake_predictor = dict(model_name=['fake_predictor'])
@@ -87,6 +110,10 @@ class C:
                         explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
                                               num_samples=[500], ),
                         )
+    shap_only_ev_50 = dict(explainer_name=['shap'],
+                           explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
+                                                 num_samples=[50], ),
+                           )
     n_perturb_time = [int(x) for x in (2 ** np.arange(5, 13 + 1))]
     lime_only_ev_time = dict(explainer_name=['lime'],
                              explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=n_perturb_time, ),
@@ -190,6 +217,15 @@ experiment_definitions_list = [
     dict(experiment_id='fbs_np_2.0', ) | C.BASE_CONFIG |
     C.baseline_feverous_model | C.shap_only_ev | C.not_precomputed_datasets_conf,
 
+    dict(experiment_id='lla_np_1.0', ) | C.BASE_CONFIG |
+    C.roberta_v0 | C.lime_only_ev | C.not_precomputed_datasets_conf,
+
+    dict(experiment_id='lla_np_2.0', ) | C.BASE_CONFIG |
+    C.roberta_v0 | C.shap_only_ev | C.not_precomputed_datasets_conf,
+
+    dict(experiment_id='lla_np_1.test', ) | C.BASE_CONFIG |
+    C.roberta_v0 | C.lime_only_ev | C.not_precomputed_datasets_conf_10,
+
     dict(experiment_id='oc_fbs_np_1.0', ) | C.BASE_CONFIG |
     C.baseline_feverous_model | C.claim_only_explainer | C.not_precomputed_datasets_conf,
 
@@ -220,5 +256,12 @@ experiment_definitions_list = [
     | C.feverous_ds_100
     # C.politihop_10_test
     ,
+
+    dict(experiment_id='test_3.0', ) | C.BASE_CONFIG | C.roberta_v0 | C.lime_only_ev_50 | C.feverous_ds_xs,
+    dict(experiment_id='test_3.1', ) | C.BASE_CONFIG | C.roberta_v0 | C.shap_only_ev_50 | C.feverous_ds_xs,
+    dict(experiment_id='test_2.0', ) | C.BASE_CONFIG | C.baseline_feverous_model | C.lime_only_ev_50 | C.feverous_ds_xs,
+    dict(experiment_id='test_2.1', ) | C.BASE_CONFIG | C.baseline_feverous_model | C.shap_only_ev_50 | C.feverous_ds_xs,
+    dict(experiment_id='test_1.0', ) | C.BASE_CONFIG | C.fake_predictor | C.lime_only_ev_50 | C.politihop_xs_test,
+    dict(experiment_id='test_1.1', ) | C.BASE_CONFIG | C.fake_predictor | C.shap_only_ev_50 | C.politihop_xs_test,
 
 ]

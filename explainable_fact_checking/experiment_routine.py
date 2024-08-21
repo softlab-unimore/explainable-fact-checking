@@ -1,3 +1,4 @@
+import os
 import gc
 import itertools
 import json
@@ -10,7 +11,7 @@ from datetime import datetime
 from tqdm import tqdm
 
 import explainable_fact_checking as xfc
-import os
+
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 print("CUDA_DEVICE_ORDER:", os.environ.get("CUDA_DEVICE_ORDER"))
@@ -20,8 +21,6 @@ print("CUDA is available:", torch.cuda.is_available())
 # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-# Root directory
-base_path = '/homes/bussotti/feverous_work/feverousdata'
 
 
 class ExperimentRunner:
@@ -230,8 +229,10 @@ experiments_doing = [
 if __name__ == "__main__":
 
     experiments_to_run = [
+        'lla_np_1.test',
         'sms_p_1.0',
     ]
+
 
     experiment_runner = ExperimentRunner()
     for exp_id in experiments_to_run:

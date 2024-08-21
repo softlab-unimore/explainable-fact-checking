@@ -57,6 +57,6 @@ model_factory = xfc.xfc_utils.GeneralFactory()
 # Register the models
 model_factory.register_creator('default', xfc.FeverousModelAdapter)
 
-model_factory.register_creator('Roberta', xfc.model_adapters.LLMAdapter)
+model_factory.register_creator('Roberta', xfc.model_adapters.LLama3_1Adapter)
 
 model_factory.register_creator('fake_predictor', FakePredictor)
