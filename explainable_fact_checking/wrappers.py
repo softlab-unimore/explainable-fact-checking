@@ -8,7 +8,7 @@ from explainable_fact_checking import C
 
 class CustomTokenizer(PreTrainedTokenizer):
     def __init__(self, vocab_file, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        super().__init__(**kwargs)
         self.vocab_file = vocab_file
 
         # Load vocabulary from file
@@ -19,7 +19,7 @@ class CustomTokenizer(PreTrainedTokenizer):
             vocab = {word.strip(): i for i, word in enumerate(f)}
         return vocab
 
-    def _tokenize(self, text):
+    def _tokenize(self, text, **kwargs):
         return text.split(" ||| ")
 
     def _convert_token_to_id(self, token):
@@ -32,7 +32,7 @@ class CustomTokenizer(PreTrainedTokenizer):
         return self.unk_token
 
 
-class FeverousRecordWrapper:
+class ModelWrapper:
     example_structure = {
         "evidence": [{"content": ["Aramais Yepiskoposyan_cell_0_6_1", "FC Ararat Yerevan_sentence_1"], "context": {
             "Aramais Yepiskoposyan_cell_0_6_1": ["Aramais Yepiskoposyan_title",
@@ -61,53 +61,63 @@ class FeverousRecordWrapper:
     evidence_separator = r' </s> '
     reference_record = {}
 
-    def __init__(self, record, predictor, separator=r' </s> ', perturbation_mode='only_evidence', explainer='lime',
-                 debug=False):
+
+    def __init__(self, record, predictor, separator=r' </s> ', perturbation_mode='only_evidence', explainer='lime', debug=False):
         self.record = record
-        self.evidence_array = np.array(self.generate_evidence_list(record))
-        self.evidence_index_map = self.generate_evidence_index_map(self.evidence_array)
-        self.claim = None
-        self.mode = 'normal'
-        self.params_to_report = {}
-        # if 'claim' not in record raise an error
-        if 'claim' not in record:
-            raise ValueError('Claim not found in record')
-        if explainer not in ['shap', 'lime']:
-            raise ValueError('Explainer not recognized')
-
-        if C.EV_KEY in record:
-            self.mode = C.EV_KEY
-        else: # feverous dataset
-
-            if explainer == 'shap':
-                self.get_perturbed_evidence_list = self.reconstruct_shap_feveous
-                # self.restructure_perturbed_records = self.restructure_records_position_codes_shap_feverous
-            elif explainer == 'lime':
-                self.get_perturbed_evidence_list = self.reconstruct_lime_feverous
-                # self.restructure_perturbed_records = self.restructure_records_str_split_lime_feverous
-        self.claim = record['claim']
-        if 'input_txt_to_use' in record:
-            assert self.claim == record['input_txt_to_use'].split(separator)[
-                0], 'Claim and input_txt_to_use do not match'
-            self.mode = 'input_txt_to_use'
-            self.set_evidence = self.set_evidence_txt_to_use
-        else:
-            self.set_evidence = self.set_evidence_content
-
         self.separator = separator
         self.predict_method = predictor
-        self.id = record['id']
         self.explainer = explainer
+        self.validate()
+        self.id = record['id']
+        self.claim = record['claim']
+        self.evidence_array = np.array(self.generate_evidence_list(record))
+        self.evidence_index_map = self.generate_evidence_index_map(self.evidence_array)
+        self.mode = self.determine_mode()
+        self.params_to_report = {}
+        self.debug = debug
+        if self.debug:
+            self.debug_data = {}
+
+        if self.mode == C.EV_KEY:
+            self.restructure_records = self.restructure_records_strings
+        elif self.mode == 'normal':
+            self.restructure_records = self.restructure_records_dict
+
+        if explainer == 'shap':
+            self.reconstruct_evidence_list = self.reconstruct_from_shap
+        elif explainer == 'lime':
+            self.reconstruct_evidence_list = self.reconstruct_from_lime
 
         if perturbation_mode == 'only_evidence':
             self.get_text_to_perturb = self.get_evidence_string
         elif perturbation_mode == 'claim_and_evidence':
-            # todo adjust with composition wrt the mode of perturbation
-            raise (NotImplementedError('Not implemented yet'))
+            self.get_text_to_perturb = self.raise_not_implemented
 
-        self.debug = debug
-        if debug:
-            self.debug_data = {}
+    def validate(self):
+        if 'claim' not in self.record:
+            raise ValueError('Claim not found in record')
+        if 'id' not in self.record:
+            raise ValueError('Id not found in record')
+        if self.explainer not in ['shap', 'lime']:
+            raise ValueError('Explainer not recognized. Choose between shap and lime.')
+
+    def determine_mode(self):
+        record = self.record
+        if C.TXT_TO_USE in record:
+            assert self.claim == record[C.TXT_TO_USE].split(self.separator)[0], 'Claim and input_txt_to_use do not match'
+        elif C.EV_KEY in record:
+            return C.EV_KEY
+        return 'normal'
+
+    def select_text_perturbation(self, perturbation_mode):
+        modes = {
+            'only_evidence': self.get_evidence_string,
+            'claim_and_evidence': self.raise_not_implemented
+        }
+        return modes.get(perturbation_mode, self.raise_not_implemented)
+
+    def raise_not_implemented(self):
+        raise NotImplementedError('Not implemented yet')
 
     def get_id(self):
         return self.id
@@ -117,10 +127,7 @@ class FeverousRecordWrapper:
 
     @staticmethod
     def generate_evidence_index_map(evidence_list):
-        content_index_map = {}
-        for i, ev in enumerate(evidence_list):
-            content_index_map[ev] = i
-        return content_index_map
+        return {ev: i for i, ev in enumerate(evidence_list)}
 
     def get_evidence_string(self):
         evidence_content = self.generate_evidence_list(self.record)
@@ -134,9 +141,9 @@ class FeverousRecordWrapper:
         restructured_records = self.restructure_records(perturbed_evidence_string_list)
         predictions = self.predict_method(restructured_records)
         n_samples = len(restructured_records)
-        self.params_to_report |= dict( #effective_num_samples=n_samples,
-                                      total_predictions=self.params_to_report.get('total_predictions', 0) + n_samples,
-                                      )
+        self.params_to_report |= {
+            'total_predictions': self.params_to_report.get('total_predictions', 0) + n_samples,
+        }
         if self.debug:
             self.debug_data['perturbed_evidence_string_list'] = perturbed_evidence_string_list
             self.debug_data['restructured_records'] = restructured_records
@@ -157,39 +164,39 @@ class FeverousRecordWrapper:
     def restructure_perturbed_records(self, perturbed_evidence_string_list):
         pass
 
-    def restructure_records(self, perturbed_item_list):
+    def restructure_records_dict(self, perturbed_item_list):
         perturbed_record_list = [copy.deepcopy(self.record) for _ in range(len(perturbed_item_list))]
         for i, (ev, turn_record) in enumerate(zip(perturbed_item_list, perturbed_record_list)):
-            evidence_list = self.get_perturbed_evidence_list(ev)
+            evidence_list = self.reconstruct_evidence_list(ev)
             turn_record['id'] = i
             self.set_evidence(turn_record, evidence_list)
         return perturbed_record_list
 
-    def reconstruct_shap_feveous(self, pos_codes):
-        return self.evidence_array[pos_codes != -1].tolist()
+    def restructure_records_strings(self, perturbed_item_list):
+        str_list = []
+        for i, ev in enumerate(perturbed_item_list):
+            evidence_list = self.reconstruct_evidence_list(ev)
+            c_str = self.separator.join([self.claim] + evidence_list)
+            str_list.append(c_str)
+        return np.array(str_list)
 
-    def reconstruct_lime_feverous(self, ev):
-        evidence_list = ev.split(self.separator)
+    def reconstruct_from_shap(self, item):
+        return self.evidence_array[item != -1].tolist()
+
+    def reconstruct_from_lime(self, item):
+        evidence_list = item.split(self.separator)
         # remove 'UNKWORDZ' from the evidence list. lime with bow=False replace missing words with 'UNKWORDZ'
         return [ev for ev in evidence_list if ev != 'UNKWORDZ']
 
-    @staticmethod
-    def generate_evidence_list(record):
-        # if 'input_txt_to_use' in keys of dictionary split the string by '<\e>' the first item is the claim from the second to the end are the evidence
-        # remove additional spaces
-        # return the list of evidence
+    def generate_evidence_list(self, record):
         if xfc.C.TXT_TO_USE in record:
-            all_el = record[xfc.C.TXT_TO_USE].split(FeverousRecordWrapper.evidence_separator)
+            all_el = record[xfc.C.TXT_TO_USE].split(self.evidence_separator)
             evidence_list = all_el[1:]
-            # claim = all_el[0]
             return [ev.strip() for ev in evidence_list]
         elif 'evidence' in record:
             return record['evidence'][0]['content']
         else:
             return record[C.EV_KEY]
 
-    def set_evidence_content(self, record, content):
-        record['evidence'][0]['content'] = content
-
-    def set_evidence_txt_to_use(self, record, evidence_list):
+    def set_evidence(self, record, evidence_list):
         record[C.TXT_TO_USE] = self.separator.join([self.claim] + evidence_list)

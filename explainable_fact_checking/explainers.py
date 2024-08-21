@@ -25,8 +25,8 @@ class LimeXFCAdapter:
         return self.explain(*args, **kwargs)
 
     def explain(self, record, predictor):
-        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor, debug=True,
-                                                         perturbation_mode=self.perturbation_mode, **self.wrapper_params)
+        xfc_wrapper = xfc.wrappers.ModelWrapper(record, predictor, debug=True,
+                                                perturbation_mode=self.perturbation_mode, **self.wrapper_params)
 
         start_time = datetime.now()
         explainer = LimeTextExplainer(
@@ -70,9 +70,9 @@ class ShapXFCAdapter:
         return self.explain(*args, **kwargs)
 
     def explain(self, record, predictor):
-        xfc_wrapper = xfc.wrappers.FeverousRecordWrapper(record, predictor=predictor, debug=True,
-                                                         perturbation_mode=self.perturbation_mode,
-                                                         explainer='shap', **self.wrapper_params)
+        xfc_wrapper = xfc.wrappers.ModelWrapper(record, predictor=predictor, debug=True,
+                                                perturbation_mode=self.perturbation_mode,
+                                                explainer='shap', **self.wrapper_params)
         evidence_array = xfc_wrapper.get_evidence_list_SHAP()
         # set numpy random state
         np.random.seed(self.random_seed)
