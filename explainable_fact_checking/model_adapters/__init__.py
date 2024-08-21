@@ -1,1 +1,1 @@
-from .llm_adapter import LLMAdapter
+from .llm_adapter import LLama3_1Adapter
