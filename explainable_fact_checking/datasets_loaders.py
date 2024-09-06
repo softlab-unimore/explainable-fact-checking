@@ -169,7 +169,7 @@ class PolitihopDatasetLoader(GeneralDatasetLoader):
     https://github.com/copenlu/politihop/tree/master
     '''
     file_names = ['politihop_train.tsv', 'politihop_valid.tsv', 'politihop_test.tsv']
-    base_link = 'https://github.com/copenlu/politihop/blob/master/data/'
+    base_link = 'https://raw.githubusercontent.com/copenlu/politihop/master/data/'
 
     def convert_to_dict(self, df):
         '''
@@ -212,8 +212,60 @@ dataset_loader_factory.register_creator('politihop', PolitihopDatasetLoader().lo
 
 
 class LIARPlusDatasetLoader(GeneralDatasetLoader):
+    '''
+        https://github.com/Tariq60/LIAR-PLUS/tree/master
+    '''
     file_names = ['test2.tsv', 'val2.tsv', 'train2.tsv']
-    base_link = 'https://github.com/Tariq60/LIAR-PLUS/tree/master/dataset/tsv'
+    base_link = 'https://raw.githubusercontent.com/Tariq60/LIAR-PLUS/master/dataset/tsv/'
+
+    def load(self, dataset_dir, dataset_file, top=None, **kwargs):
+        '''
+
+        Parameters
+        ----------
+        dataset_dir : str
+            The directory where the dataset files are stored.
+        dataset_file : str
+            The name of the dataset file to load.
+        top : int
+            The number of records to load from the dataset file. If None, load all records.
+        kwargs : dict
+            Additional keyword arguments. Not used.
+
+
+        Returns
+        -------
+        pd.DataFrame
+            The dataset as a pandas dataframe.
+            Columns:
+                Column 1: the ID of the statement ([ID].json).
+                Column 2: the label.
+                Column 3: the statement.
+                Column 4: the subject(s).
+                Column 5: the speaker.
+                Column 6: the speaker's job title.
+                Column 7: the state info.
+                Column 8: the party affiliation.
+                Columns 9-13: the total credit history count, including the current statement.
+                9: barely true counts.
+                10: false counts.
+                11: half true counts.
+                12: mostly true counts.
+                13: pants on fire counts.
+                Column 14: the context (venue / location of the speech or statement).
+                Column 15: the extracted justification
+        '''
+        input_file = os.path.join(dataset_dir, dataset_file)
+        if dataset_file not in self.file_names:
+            raise ValueError(f"Dataset file should be one of {self.file_names}. Got {dataset_file}")
+        if not os.path.exists(input_file):
+            self.download(dataset_dir)
+        columns = ['ID', 'label', 'claim', 'subject', 'speaker', 'job_title', 'state_info', 'party_affiliation',
+                   'barely_true', 'false', 'half_true', 'mostly_true', 'pants_on_fire', 'context', 'evidence_list']
+        df = pd.read_csv(input_file, sep="\t", nrows=top, header=None, names=columns)
+
+        # convert to list of dictionaries
+        return self.convert_to_dict(df)
 
 
 dataset_loader_factory.register_creator('LIARPlus', LIARPlusDatasetLoader().load)
