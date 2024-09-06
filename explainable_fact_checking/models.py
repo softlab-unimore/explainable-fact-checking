@@ -54,9 +54,12 @@ class FakePredictor:
 # Create an instance of the factory
 model_factory = xfc.xfc_utils.GeneralFactory()
 
-# Register the models
-model_factory.register_creator('default', xfc.FeverousModelAdapter)
+from explainable_fact_checking.model_adapters.feverous_model import FeverousModelAdapter
 
-model_factory.register_creator('Roberta', xfc.model_adapters.LLama3_1Adapter)
+# Register the models
+model_factory.register_creator('default', FeverousModelAdapter)
+
+from explainable_fact_checking.model_adapters.llm_adapter import LLama3_1Adapter
+model_factory.register_creator('LLAMA3_1', LLama3_1Adapter)
 
 model_factory.register_creator('fake_predictor', FakePredictor)
