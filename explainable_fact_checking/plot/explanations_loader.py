@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import numpy as np
 import pandas as pd
 import explainable_fact_checking as xfc
 
@@ -79,10 +80,10 @@ def explanations_to_df(explanation_object_list: list):
                     tdict[key] = value
             tdict['dataset_file_name'] = tdict.pop('dataset_file')
             texp_list = explanation_to_dict_olap(explanation)
-            out_list += [x | tdict  for x in texp_list]
+            out_list += [x | tdict for x in texp_list]
     ret_df = pd.DataFrame(out_list)
     # convert the following columns in categorical ['type', 'dataset_file_name', 'model_path', 'model_name', 'perturbation_mode', 'mode']
-    for col in ['type', 'dataset_file_name', 'model_path', 'model_name', 'perturbation_mode', 'mode']:
+    for col in ['type', 'dataset_file_name', 'model_name', 'perturbation_mode', 'mode']:
         if col in ret_df.columns:
             ret_df[col] = ret_df[col].astype('category')
     # sort columns
@@ -202,7 +203,6 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
     return pd.DataFrame(out_list)
 
 
-
 def load_experiment_result_by_code(experiment_code, results_path) -> list:
     """
     Load the results of the experiments given the experiment code
@@ -238,6 +238,13 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
         exp_object_list += x
     explanation_df = explanations_to_df(exp_object_list)
     id_cols = ['dataset_file_name', 'id', 'model_path']
+
+    if 'model_path' not in explanation_df.columns:
+        explanation_df['model_path'] = np.NaN
+    explanation_df['model_path'].replace('nan', np.NaN, inplace=True) # todo check remove
+    if explanation_df['model_path'].isna().any():
+        na_mask = explanation_df['model_path'].isna()
+        explanation_df.loc[na_mask, 'model_path'] = './' + explanation_df.loc[na_mask, 'model_name'].astype(str)
     class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names_load]
     index_exp = explanation_df[id_cols]
 
@@ -249,7 +256,6 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
 
         only_claim_predictions_df = explanations_to_df(only_claim_list)
         only_claim_predictions_df['type'] = 'only_claim'
-
 
         only_claim_predictions_df.set_index(id_cols, inplace=True, drop=True)
         common_index = pd.MultiIndex.from_frame(index_exp).intersection(
@@ -305,10 +311,12 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
     return all_df
 
 
-
 if __name__ == '__main__':
     df = load_preprocess_explanations(experiment_code_list=[
-        'fbs_time_1.1',
+        'fbs_np_1.0',
+        'fbs_np_2.0',
+        'lla_np_1.0',
+        'lla_np_2.0',
     ])
     load_preprocess_explanations(experiment_code_list=[
         'sk_f_jf_1.1',
@@ -326,4 +334,3 @@ if __name__ == '__main__':
         'oc_1.1',
         'oc_fbs_np_1.0',
     ], save_name='all_exp.csv')
-
