@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+from itertools import islice
 
 import numpy as np
 import scipy.stats as st
@@ -190,3 +191,11 @@ class GeneralFactory:
                 f'The name specified ({name}) is not registered. Valid options are {self._creators.keys()}')
         creator = self._creators[name]
         return creator(**kwargs)
+
+def batched(iterable, n):
+    # batched('ABCDEFG', 3) → ABC DEF G
+    if n < 1:
+        raise ValueError('n must be at least one')
+    iterator = iter(iterable)
+    while batch := tuple(islice(iterator, n)):
+        yield batch
