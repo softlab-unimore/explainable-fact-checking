@@ -1,4 +1,15 @@
 import os
+
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
+print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
+print("CUDA_DEVICE_ORDER:", os.environ.get("CUDA_DEVICE_ORDER"))
+
+import torch
+
+print("CUDA is available:", torch.cuda.is_available())
+
 import gc
 import itertools
 import json
@@ -11,16 +22,7 @@ from datetime import datetime
 from tqdm import tqdm
 
 import explainable_fact_checking as xfc
-
-
-print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
-print("CUDA_DEVICE_ORDER:", os.environ.get("CUDA_DEVICE_ORDER"))
-import torch
-
-print("CUDA is available:", torch.cuda.is_available())
-# os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
+from explainable_fact_checking import models
 
 
 class ExperimentRunner:
@@ -28,6 +30,12 @@ class ExperimentRunner:
     @staticmethod
     def product_dict(**kwargs):
         keys = kwargs.keys()
+        # check that all values are non-empty lists
+        for k, v in kwargs.items():
+            if not isinstance(v, list):
+                raise TypeError(f"Value {v} is not a valid collection for key {k}")
+            if len(v) == 0:
+                raise ValueError(f"Value {v} cannot be empty for key {k}")
         return [dict(zip(keys, instance)) for instance in itertools.product(*kwargs.values())]
 
     @staticmethod
@@ -167,7 +175,7 @@ class ExperimentRunner:
         for t_params in [model_params, explainer_params, dataset_params]:
             t_params['random_seed'] = t_params.get('random_seed', random_seed)
         dataset = xfc.datasets_loaders.dataset_loader_factory.create(dataset_name, **dataset_params)
-        model = xfc.models.model_factory.create(model_name, **model_params)
+        model = models.model_factory.create(model_name, **model_params)
         explainer = xfc.explainers.explainer_factory.create(explainer_name, **explainer_params)
         exp_list = []
         if hasattr(explainer, 'explain_list'):
@@ -217,22 +225,31 @@ experiment_done = [
     'fbs_time_2.0',
     'fbs_time_1.0',
 
+    'fbs_time_1.1',
+    'fbs_time_2.1',
+
+    'lla_np_1.0',
+    'lla_np_2.0',
+    'lla_fv_1.0',
+    'lla_fv_1.1',
+    'lla_fv_1.2',
 ]
 
 experiments_doing = [
+]
 
-    'fbs_time_1.1',
-    'fbs_time_2.1',
+test_conf = [
+    'lla_np_1.test',
+    'sms_p_1.0',
 ]
 
 # main thing to start the experiment
 if __name__ == "__main__":
 
     experiments_to_run = [
-        'lla_np_1.test',
-        'sms_p_1.0',
+        'st_1.0',
+        # 'lla_np_1.test',
     ]
-
 
     experiment_runner = ExperimentRunner()
     for exp_id in experiments_to_run:
