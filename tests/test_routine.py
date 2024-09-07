@@ -1,15 +1,16 @@
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from explainable_fact_checking.experiment_routine import ExperimentRunner
 
 
 # main thing to start the experiment
 def test_routine():
     test_routine = [
+        'test_3.0',
+        'test_1.0',
         'test_2.0',
         'test_2.1',
-        'test_1.0',
         'test_1.1',
     ]
 

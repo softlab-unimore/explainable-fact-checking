@@ -10,7 +10,29 @@ import jsonlines
 # Get length of the list of dictionaries
 # [len(x['input_txt_to_use'].split('</s>'))-1 for x in restructured_records]
 
+def convert_list_to_string(input_list):
+    # Join the list elements into a single string with spaces in between
+    return ' '.join(input_list)
 
+# Example usage
+input_list = ["Accompanying an array of images in a recent Facebook post , including photos of civil court filings, screenshots of tweets, and a picture of U.S. House Speaker Nancy Pelosi, is one explosive allegation: that the California Democrat was arrested.",
+              "This post was flagged as part of Facebook\\u2019s efforts to combat false news and misinformation on its News Feed.",
+              "(Read more about our partnership with Facebook .)",
+              "There are screenshots of several tweets from one account in the Facebook post, including these: \"BREAKING While leaving the US Capitol nancy Pelosi has been intercepted by US Marshals and ARRESTED (!)",
+              "under the direct order of President Trump.", "WH claims ripping up speech was violation of decorum provision of Rule XIX!\"",
+              "\"Marshals holding Pelosi are NOT(!)",
+              "allowing her a phone call or to contact her attorneys.",
+              "Chuck Schumer is racing back to the US capitol.",
+              "White House sources say that she will be transported to undisclosed location TONIGHT (!)",
+              "to face MILITARY TRIBUNAL (!!!)\"",
+              "First of all, Pelosi didn\\u2019t break the law when she tore up a copy of President Donald Trump\\u2019s State of the Union address on Feb. 4.",
+              "Trump , among others , wrongly claimed it was illegal.",
+              "And while some people have signed a Change.org petition calling for her arrest after she ripped up her copy of the president\\u2019s speech, no arrest has happened.",
+              "We found no news coverage online about Pelosi being taken into custody.",
+              "If she had been arrested, it would have drawn plenty of media attention."]
+
+result = convert_list_to_string(input_list)
+print(result)
 
 {"evidence": [{"content": ["Algebraic logic_sentence_0", "Lindenbaum\u2013Tarski algebra_sentence_1",
                            "Lindenbaum\u2013Tarski algebra_sentence_6", "Lindenbaum\u2013Tarski algebra_sentence_3",
