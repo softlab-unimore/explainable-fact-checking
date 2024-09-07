@@ -1,3 +1,4 @@
+import copy
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -137,6 +138,7 @@ class ExperimentRunner:
         for i, kwargs in tqdm(enumerate(self.product_dict(**params_dict_to_iterate))):
             gc.collect()
             logger.info(f"Iteration: {i} with parameters: {kwargs}")
+            kwargs = copy.deepcopy(kwargs)
             kwargs['results_dir'] = os.path.join(results_dir, str(i))
             turn_a = datetime.now()
 
@@ -156,8 +158,11 @@ class ExperimentRunner:
         logger.info(f"Experiment {experiment_id} completed in {end_time - start_time}")
 
     def launch_single_experiment(self, experiment_id, dataset_name, results_dir, random_seed, model_name,
-                                 logger, explainer_name, dataset_params={}, model_params={},
-                                 explainer_params={}, **kwargs):
+                                 logger, explainer_name, dataset_params=None, model_params=None,
+                                 explainer_params=None, **kwargs):
+        dataset_params = copy.deepcopy(dataset_params) if dataset_params else {}
+        model_params = copy.deepcopy(model_params) if model_params else {}
+        explainer_params = copy.deepcopy(explainer_params) if explainer_params else {}
         try:
             if os.path.exists(results_dir):
                 shutil.rmtree(results_dir + '.old', ignore_errors=True)
@@ -239,6 +244,8 @@ experiments_doing = [
 ]
 
 test_conf = [
+
+    'st_1.0',
     'lla_np_1.test',
     'sms_p_1.0',
 ]
@@ -247,7 +254,8 @@ test_conf = [
 if __name__ == "__main__":
 
     experiments_to_run = [
-        'st_1.0',
+        'st_1.1',
+        'st_1.2',
         # 'lla_np_1.test',
     ]
 

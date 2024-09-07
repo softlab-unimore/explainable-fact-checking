@@ -75,7 +75,7 @@ def explanations_to_df(explanation_object_list: list):
             for key, value in params_dict.items():
                 if isinstance(value, dict):
                     for subkey, subvalue in value.items():
-                        tdict[subkey] = subvalue
+                        tdict[key + '__' + subkey] = subvalue
                 else:
                     tdict[key] = value
             tdict['dataset_file_name'] = tdict.pop('dataset_file')
@@ -231,7 +231,9 @@ def load_experiment_result_by_code(experiment_code, results_path) -> list:
     return results_list
 
 
-def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list: list = [], save_name=None):
+def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list=None, save_name=None):
+    if only_claim_exp_list is None:
+        only_claim_exp_list = []
     exp_object_list = []
     for experiment_code in experiment_code_list:
         x = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
@@ -241,7 +243,7 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
 
     if 'model_path' not in explanation_df.columns:
         explanation_df['model_path'] = np.NaN
-    explanation_df['model_path'].replace('nan', np.NaN, inplace=True) # todo check remove
+    explanation_df['model_path'].replace('nan', np.NaN, inplace=True)  # todo check remove
     if explanation_df['model_path'].isna().any():
         na_mask = explanation_df['model_path'].isna()
         explanation_df.loc[na_mask, 'model_path'] = './' + explanation_df.loc[na_mask, 'model_name'].astype(str)
@@ -312,6 +314,9 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
 
 
 if __name__ == '__main__':
+    df = load_preprocess_explanations(experiment_code_list=[
+        'st_1.0',
+    ])
     df = load_preprocess_explanations(experiment_code_list=[
         'fbs_np_1.0',
         'fbs_np_2.0',
