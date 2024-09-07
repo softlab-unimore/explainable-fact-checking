@@ -108,19 +108,49 @@ class AddInputTxtToUse:
                 f_out.write(json.dumps(record) + '\n')
 
 
-def feverous_loader(dataset_dir, dataset_file, top=None, **kwargs):
+def feverous_loader(dataset_dir, dataset_file, nrows=None, skiprows=None, **kwargs):
+    """
+    Load the dataset from the given file in the given directory.
+
+    Parameters
+    ----------
+    dataset_dir : str
+        The directory where the dataset files are stored.
+    dataset_file : str
+        The name of the dataset file to load.
+    nrows : int
+        The number of records to load from the dataset file. If None, load all records
+    skiprows : list-like, int or callable, optional
+        Line numbers to skip (0-indexed) or number of lines to skip (int)
+        at the start of the file.
+
+        If callable, the callable function will be evaluated against the row
+        indices, returning True if the row should be skipped and False otherwise.
+        An example of a valid callable argument would be ``lambda x: x in [0, 2]``.
+    kwargs
+
+    Returns
+    -------
+    list
+        The dataset as a list of dictionaries.
+    """
     data = []
     input_file = os.path.join(dataset_dir, dataset_file)
     input_file = AddInputTxtToUse.check_dataset(input_file)
 
-    early_stop = top is not None
     with open(input_file, 'r') as file:
-        if early_stop:
+        # skip rows if needed
+        if skiprows is not None:
+            for i in range(skiprows):
+                next(file)
+        if nrows is not None:
             for i, line in enumerate(file):
-                if i >= top:
+                if i > nrows:
                     break
                 if line != '\n':
                     data.append(json.loads(line))
+                elif line == '\n':
+                    nrows += 1
         else:
             for i, line in enumerate(file):
                 if line != '\n':
@@ -145,14 +175,14 @@ class GeneralDatasetLoader:
             url = self.base_link + file_name + '?raw=true'
             urlretrieve(url, os.path.join(dest_dir, file_name))
 
-    def load(self, dataset_dir, dataset_file, top=None, **kwargs):
+    def load(self, dataset_dir, dataset_file, nrows=None, skiprows=None, **kwargs):
         input_file = os.path.join(dataset_dir, dataset_file)
         if dataset_file not in self.file_names:
             raise ValueError(f"Dataset file should be one of {self.file_names}. Got {dataset_file}")
         if not os.path.exists(input_file):
             self.download(dataset_dir)
         # load dataframe from tsv
-        df = pd.read_csv(input_file, sep="\t", nrows=top)
+        df = pd.read_csv(input_file, sep="\t", nrows=nrows, skiprows=skiprows)
         # convert to list of dictionaries
         return self.convert_to_dict(df)
 
@@ -218,7 +248,7 @@ class LIARPlusDatasetLoader(GeneralDatasetLoader):
     file_names = ['test2.tsv', 'val2.tsv', 'train2.tsv']
     base_link = 'https://raw.githubusercontent.com/Tariq60/LIAR-PLUS/master/dataset/tsv/'
 
-    def load(self, dataset_dir, dataset_file, top=None, **kwargs):
+    def load(self, dataset_dir, dataset_file, nrows=None, skiprows=None, **kwargs):
         '''
 
         Parameters
@@ -227,7 +257,7 @@ class LIARPlusDatasetLoader(GeneralDatasetLoader):
             The directory where the dataset files are stored.
         dataset_file : str
             The name of the dataset file to load.
-        top : int
+        nrows : int
             The number of records to load from the dataset file. If None, load all records.
         kwargs : dict
             Additional keyword arguments. Not used.
@@ -262,7 +292,7 @@ class LIARPlusDatasetLoader(GeneralDatasetLoader):
             self.download(dataset_dir)
         columns = ['ID', 'label', 'claim', 'subject', 'speaker', 'job_title', 'state_info', 'party_affiliation',
                    'barely_true', 'false', 'half_true', 'mostly_true', 'pants_on_fire', 'context', 'evidence_list']
-        df = pd.read_csv(input_file, sep="\t", nrows=top, header=None, names=columns)
+        df = pd.read_csv(input_file, sep="\t", nrows=nrows, skiprows=skiprows, header=None, names=columns)
 
         # convert to list of dictionaries
         return self.convert_to_dict(df)
