@@ -202,3 +202,7 @@ def batched(iterable, n):
     iterator = iter(iterable)
     while batch := tuple(islice(iterator, n)):
         yield batch
+
+
+def is_debugging():
+    return hasattr(sys, 'gettrace') and sys.gettrace() is not None
