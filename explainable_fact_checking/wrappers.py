@@ -169,6 +169,7 @@ class ModelWrapper:
         for i, (ev, turn_record) in enumerate(zip(perturbed_item_list, perturbed_record_list)):
             evidence_list = self.reconstruct_evidence_list(ev)
             turn_record['id'] = i
+            turn_record['evidence'] = evidence_list
             self.set_evidence(turn_record, evidence_list)
         return perturbed_record_list
 
@@ -194,6 +195,8 @@ class ModelWrapper:
             evidence_list = all_el[1:]
             return [ev.strip() for ev in evidence_list]
         elif 'evidence' in record:
+            if isinstance(record['evidence'], list):
+                return record['evidence']
             return record['evidence'][0]['content']
         else:
             return record[C.EV_KEY]
