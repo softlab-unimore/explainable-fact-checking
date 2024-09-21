@@ -1,6 +1,8 @@
 import copy
 import os
 
+import pydantic.utils
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -86,8 +88,10 @@ class ExperimentRunner:
 
         return exp_dict
 
-    def launch_experiment_by_id(self, experiment_id: str, config_file_path=None):
+    def launch_experiment_by_id(self, experiment_id: str, config_file_path=None, additional_params=None):
         exp_dict = self.get_config_by_id(experiment_id, config_file_path)
+        if additional_params:
+            exp_dict = pydantic.utils.deep_update(exp_dict, additional_params)
         self.launch_experiment_by_config(exp_dict)
 
     def launch_experiment_by_config(self, exp_dict: dict):
@@ -139,7 +143,8 @@ class ExperimentRunner:
         start_time = datetime.now()
         for i, kwargs in tqdm(enumerate(self.product_dict(**params_dict_to_iterate))):
             gc.collect()
-            logger.info(f"Iteration: {i} with parameters: {kwargs}")
+            logger.info(f"Iteration: {i} with parameters: ")
+            print(json.dumps(kwargs, indent=4, sort_keys=True))
             kwargs = copy.deepcopy(kwargs)
             kwargs['results_dir'] = os.path.join(results_dir, str(i))
             turn_a = datetime.now()
@@ -243,11 +248,17 @@ experiment_done = [
 ]
 
 exp_to_analyse = [
-    'fv_fm_1.0',
-    'fv_fm_2.0',
 ]
 
 experiments_doing = [
+        'fv_f2l_1.0',
+        'fv_fm_1.0',
+        'fv_fm_2.0',
+        'fv_sf_1.0',
+        'fv_sf_2.0',
+        'fv_f3l_1.0',
+        'fv_f2l_2.0',
+        'fv_f3l_2.0',
 ]
 
 test_conf = [
@@ -261,12 +272,7 @@ test_conf = [
 if __name__ == "__main__":
 
     experiments_to_run = [
-        'fv_f2l_1.0',
-        'fv_sf_1.0',
-        'fv_sf_2.0',
-        'fv_f3l_1.0',
-        'fv_f2l_2.0',
-        'fv_f3l_2.0',
+
         # 'gfce_sf_1.1test',
         # 'st_1.1',
         # 'st_1.2',
@@ -278,4 +284,10 @@ if __name__ == "__main__":
         if exp_id in experiment_done:
             print(f"Experiment {exp_id} already done, skipping...")
             continue
-        experiment_runner.launch_experiment_by_id(exp_id)
+        # if debug mode create additional params
+        if xfc.xfc_utils.is_debugging():
+            print(f"Running experiment {exp_id} in debug mode")
+            additional_params = dict(dataset_params=dict(nrows=5))
+        else:
+            additional_params = None
+        experiment_runner.launch_experiment_by_id(exp_id, additional_params=additional_params)
