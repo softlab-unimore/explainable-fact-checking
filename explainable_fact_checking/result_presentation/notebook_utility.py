@@ -1,7 +1,11 @@
 
-import sys, os
+import sys, os, random
 from sklearn.metrics import roc_curve
 import numpy as np
+import copy
+import json
+
+import explainable_fact_checking.experiment_definitions
 
 print(sys.executable)
 # insert '/home/bussotti/AB/code XFC' in the path
@@ -99,8 +103,9 @@ columns_order_map = {
     'y': {'ground_truth': 0, 'predicted_label': 1},
     'model_id': {model_id: i for i, model_id in enumerate(['feverous_verdict_predictor', 'models_fromjf270623or'])},
     'explainer_name': {explainer_name: i for i, explainer_name in enumerate(['claim_only_pred', 'lime', 'shap', ])},
-    'predicted_label': {class_: i for i, class_ in enumerate(xfc.xfc_utils.class_names)},
-    'class': {class_: i for i, class_ in enumerate(xfc.xfc_utils.class_names)},
+    'predicted_label': {class_: i for i, class_ in enumerate(
+        explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES)},
+    'class': {class_: i for i, class_ in enumerate(explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES)},
 
 }
 

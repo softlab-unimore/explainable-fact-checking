@@ -78,7 +78,10 @@ def explanations_to_df(explanation_object_list: list):
                         tdict[key + '__' + subkey] = subvalue
                 else:
                     tdict[key] = value
-            tdict['dataset_file_name'] = tdict.pop('dataset_file')
+            if 'dataset_params__dataset_file' in tdict:
+                tdict['dataset_file_name'] = tdict.pop('dataset_params__dataset_file')
+            else:
+                tdict['dataset_file_name'] = tdict['dataset_name']
             texp_list = explanation_to_dict_olap(explanation)
             out_list += [x | tdict for x in texp_list]
     ret_df = pd.DataFrame(out_list)
@@ -315,7 +318,7 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
 
 if __name__ == '__main__':
     df = load_preprocess_explanations(experiment_code_list=[
-        'st_1.0',
+        'fv_fm_1.0test',
     ])
     df = load_preprocess_explanations(experiment_code_list=[
         'fbs_np_1.0',
