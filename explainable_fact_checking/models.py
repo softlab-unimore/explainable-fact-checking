@@ -1,6 +1,8 @@
 import numpy as np
 
 import explainable_fact_checking as xfc
+from explainable_fact_checking.model_adapters.genFCExp import GenFCExp
+from explainable_fact_checking.model_adapters.roberta import RobertaWrapper
 
 
 # models_dict = {
@@ -55,11 +57,13 @@ class FakePredictor:
 model_factory = xfc.xfc_utils.GeneralFactory()
 
 from explainable_fact_checking.model_adapters.feverous_model import FeverousModelAdapter
-
-# Register the models
 model_factory.register_creator('default', FeverousModelAdapter)
 
 from explainable_fact_checking.model_adapters.llm_adapter import LLama3_1Adapter
 model_factory.register_creator('LLAMA3_1', LLama3_1Adapter)
 
 model_factory.register_creator('fake_predictor', FakePredictor)
+
+model_factory.register_creator('Roberta', RobertaWrapper)
+
+model_factory.register_creator('GenFCExp', GenFCExp)
