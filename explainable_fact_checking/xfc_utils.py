@@ -20,7 +20,6 @@ class C:  # general costants
 # Root directory
 base_path = '/homes/bussotti/feverous_work/feverousdata'
 
-class_names = ['NEI', 'SUPPORTS', 'REFUTES']
 class_names_load = ['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES']
 
 
@@ -188,9 +187,13 @@ class GeneralFactory:
     def create(self, name, **kwargs):
         if name not in self._creators:
             raise ValueError(
-                f'The name specified ({name}) is not registered. Valid options are {self._creators.keys()}')
+                f'''The name specified ({name}) is not registered. Valid options are {self._creators.keys()}.
+                Please register the creator before using it. 
+                To do so use `register_creator` from `explainable_fact_checking.datasets_loaders.dataset_loader_factory` after importing the library.
+                ''')
         creator = self._creators[name]
         return creator(**kwargs)
+
 
 def batched(iterable, n):
     # batched('ABCDEFG', 3) → ABC DEF G

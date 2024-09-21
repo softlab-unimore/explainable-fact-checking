@@ -12,14 +12,20 @@ from lime.lime_text import LimeTextExplainer
 from shap import Explanation
 
 import explainable_fact_checking as xfc
+import explainable_fact_checking.experiment_definitions
 
 
 class LimeXFCAdapter:
-    def __init__(self, perturbation_mode, num_samples=50, random_seed=42, wrapper_params={}):
+    def __init__(self, perturbation_mode, num_samples=50, random_seed=42, wrapper_params=None, class_names=None):
+        if wrapper_params is None:
+            wrapper_params = {}
+        if class_names is None:
+            class_names = explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
         self.wrapper_params = wrapper_params
+        self.class_names = class_names
 
     def __call__(self, *args, **kwargs):
         return self.explain(*args, **kwargs)
@@ -33,7 +39,7 @@ class LimeXFCAdapter:
             split_expression=xfc_wrapper.tokenizer,
             # Order matters, and we cannot use bag of words.
             bow=False,
-            class_names=['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES'],
+            class_names=self.class_names,
             random_state=self.random_seed,
         )
         labels = range(len(explainer.class_names))
@@ -59,12 +65,17 @@ class LimeXFCAdapter:
 
 
 class ShapXFCAdapter:
-    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, wrapper_params={}):
+    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, wrapper_params=None, class_names=None):
+        if class_names is None:
+            class_names = explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES
+        if wrapper_params is None:
+            wrapper_params = {}
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
         self.mode = mode
         self.wrapper_params = wrapper_params
+        self.class_names = class_names
 
     def __call__(self, *args, **kwargs):
         return self.explain(*args, **kwargs)

@@ -1,5 +1,7 @@
 import numpy as np
 
+DEF_CLASS_NAMES = [('NEI', 'SUPPORTS', 'REFUTES')]
+
 
 class C:
     MODEL_DIR = 'models'
