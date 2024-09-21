@@ -11,3 +11,5 @@ transformers==4.30.2
 scikit-learn
 sentence-transformers==2.2.2
 spacy==3.7.3
+rank_bm25
+pydantic
