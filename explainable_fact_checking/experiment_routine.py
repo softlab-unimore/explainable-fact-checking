@@ -2,7 +2,7 @@ import copy
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 print("CUDA_DEVICE_ORDER:", os.environ.get("CUDA_DEVICE_ORDER"))
@@ -17,11 +17,8 @@ import json
 import pickle
 import shutil
 import sys
-from collections.abc import Iterable
 from datetime import datetime
-
 from tqdm import tqdm
-
 import explainable_fact_checking as xfc
 from explainable_fact_checking import models
 
@@ -100,8 +97,11 @@ class ExperimentRunner:
         if not isinstance(experiment_id, str):
             raise ValueError('You must specify an experiment id')
         for attr in xfc.experiment_definitions.REQUIRED_FIELDS:
-            if attr not in exp_dict.keys():
-                raise ValueError(f'You must specify some value for {attr} parameter. It\'s empty.')
+            tdict = exp_dict
+            for subattr in attr.split('.'):
+                if subattr not in tdict.keys():
+                    raise ValueError(f'You must specify some value for {attr} parameter. It\'s empty.')
+                tdict = tdict[subattr]
 
         results_dir: str = exp_dict.get('results_dir')
         if not isinstance(results_dir, str):
@@ -117,11 +117,13 @@ class ExperimentRunner:
             if isinstance(value, dict):
                 # check that the values are all lists
                 for k, v in value.items():
-                    # if str convert to list
-                    if isinstance(v, str):
+                    # # if str convert to list
+                    # if isinstance(v, str):
+                    #     value[k] = [v]
+                    if not isinstance(v, list):
                         value[k] = [v]
-                    if not isinstance(v, list) and not isinstance(v, Iterable):
-                        raise TypeError(f"Value {v} is not a valid collection")
+
+                        # raise TypeError(f"Value {v} is not a valid collection")
                 value = self.product_dict(**value)
             elif not isinstance(value, list):
                 value = [value]
