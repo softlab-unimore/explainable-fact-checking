@@ -104,8 +104,8 @@ columns_order_map = {
     'model_id': {model_id: i for i, model_id in enumerate(['feverous_verdict_predictor', 'models_fromjf270623or'])},
     'explainer_name': {explainer_name: i for i, explainer_name in enumerate(['claim_only_pred', 'lime', 'shap', ])},
     'predicted_label': {class_: i for i, class_ in enumerate(
-        explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES)},
-    'class': {class_: i for i, class_ in enumerate(explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES)},
+        explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0)},
+    'class': {class_: i for i, class_ in enumerate(explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0)},
 
 }
 

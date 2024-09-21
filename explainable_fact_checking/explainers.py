@@ -20,7 +20,7 @@ class LimeXFCAdapter:
         if wrapper_params is None:
             wrapper_params = {}
         if class_names is None:
-            class_names = explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES
+            class_names = explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
@@ -67,7 +67,7 @@ class LimeXFCAdapter:
 class ShapXFCAdapter:
     def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, wrapper_params=None, class_names=None):
         if class_names is None:
-            class_names = explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES
+            class_names = explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0
         if wrapper_params is None:
             wrapper_params = {}
         self.num_samples = num_samples

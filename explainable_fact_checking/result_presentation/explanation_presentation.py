@@ -34,7 +34,7 @@ def style_exp_to_html(exp):
     html += style_single_exp_list(exp_as_list, caption=label)
 
     """
-    pred_df = pd.DataFrame(zip(explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES, exp.predict_proba), columns=['class_names', 'predict_proba'])
+    pred_df = pd.DataFrame(zip(explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0, exp.predict_proba), columns=['class_names', 'predict_proba'])
     html = """<head> <meta charset="UTF-8"></head>"""
     html += pred_df.to_html()
     fig = px.bar(pred_df, x="predict_proba", y="class_names", orientation='h',
@@ -42,10 +42,10 @@ def style_exp_to_html(exp):
                  )
     html += pyo.plot(fig, output_type='div')
 
-    class_order = [explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES.index('SUPPORTS'), explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES.index('REFUTES'),
-                   explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES.index('NOT ENOUGH INFO')]
+    class_order = [explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0.index('SUPPORTS'), explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0.index('REFUTES'),
+                   explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0.index('NOT ENOUGH INFO')]
     for i in class_order:
-        label = explainable_fact_checking.experiment_definitions.DEF_CLASS_NAMES[i]
+        label = explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0[i]
         exp_as_list = exp.as_list(i)
         exp_as_list.insert(0, [f'[CLAIM] {exp.claim} [CLAIM]', exp.intercept[i]])
         html += style_single_exp_list(exp_as_list, caption=label)
