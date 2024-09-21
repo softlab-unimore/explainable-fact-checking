@@ -4,6 +4,8 @@ import os
 from urllib.request import urlretrieve
 
 import pandas as pd
+from datasets import Dataset, DatasetDict
+from transformers import AutoTokenizer
 
 import explainable_fact_checking as xfc
 import explainable_fact_checking.xfc_utils
@@ -300,3 +302,68 @@ class LIARPlusDatasetLoader(GeneralDatasetLoader):
 
 dataset_loader_factory.register_creator('LIARPlus', LIARPlusDatasetLoader().load)
 
+def load_std_dataset(dataset_dir, dataset_file, nrows=None, skiprows=None, **kwargs):
+    input_file = os.path.join(dataset_dir, dataset_file)
+    with open(input_file) as f:
+        obj_tr = json.load(f)
+    tokenizer = AutoTokenizer.from_pretrained('ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli')
+
+    def preprocess_function(examples):
+        return tokenizer(examples["text"], truncation=False, padding='max_length', max_length=512)
+
+    train_list = {'text': [], 'label': [], 'evs_labels': [], 'ids': []}
+    for elt in obj_tr:
+        claim_and_ev = elt['claim']
+        for ev in elt['evidence']:
+            claim_and_ev += ' </s> ' + ev
+        train_list['text'] += [claim_and_ev]
+        train_list['label'] += [elt['label']]
+        train_list['evs_labels'] += [elt['goldtag']]
+        train_list['ids'] += [elt['id']]
+    train_dataset = Dataset.from_dict(train_list)
+    dataset_dict = DatasetDict({
+        'train': train_dataset,
+    })
+    dataset_dict = dataset_dict.map(preprocess_function, batched=True)
+
+    def filter_long_sequences(example):
+        return len(example['input_ids']) <= 512
+
+    dataset_filtered = dataset_dict['train'].filter(filter_long_sequences)
+    filtered_ids = list(dataset_filtered['ids'])
+    obj_tr = [x for x in obj_tr if x['id'] in filtered_ids]
+
+    if skiprows is not None:
+        obj_tr = obj_tr[skiprows:]
+    if nrows is not None:
+        obj_tr = obj_tr[:nrows]
+    return obj_tr
+    # ds_list = {'text': [], 'label': [], 'evs_labels': [], 'ids': []}
+    # for elt in obj_tr:
+    #     claim_and_ev = elt['claim']
+    #     for ev in elt['evidence']:
+    #         claim_and_ev += '</s>' + ev
+    #
+    #     ds_list['text'] += [claim_and_ev]
+    #
+    #     ds_list['label'] += [elt['label']]
+    #     ds_list['evs_labels'] += [elt['goldtag']]
+    #     ds_list['ids'] += [elt['id']]
+    # dataset = Dataset.from_dict(ds_list)
+    # # dataset_dict = DatasetDict({
+    # #     'dev': dataset,
+    # # })
+    # # def preprocess_function(examples):
+    # #     return tokenizer(examples["text"], truncation=False, padding='max_length', max_length=512)
+    # #
+    # # dataset_dict = dataset_dict.map(preprocess_function, batched=True)
+    # # dataset_dict.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label', 'evs_labels'])
+    # return dataset
+
+dataset_loader_factory.register_creator('FM2', load_std_dataset)
+
+dataset_loader_factory.register_creator('SciFact', load_std_dataset)
+
+dataset_loader_factory.register_creator('feverous2l', load_std_dataset)
+
+dataset_loader_factory.register_creator('feverous3l', load_std_dataset)
