@@ -1,3 +1,6 @@
+import copy
+from pydantic.utils import deep_update as du
+from os.path import join as ospj
 import numpy as np
 
 DEF_CLASS_NAMES = [('NEI', 'SUPPORTS', 'REFUTES')]
@@ -7,12 +10,16 @@ class C:
     MODEL_DIR = 'models'
     PREDICTION_DIR = 'predictions'
     EVALUATION_DIR = 'evaluation'
+    BASE_DIR_V2 = '/home/bussotti/experiments_Andrea_JF_ShapAndCo/'
+    MODELS_DIR_V2 = ospj(BASE_DIR_V2, 'models')
     RESULTS_DIR = '/home/bussotti/XFCresults/experiments'
     PLOT_DIR = '/home/bussotti/XFCresults/plots'
-    DATASET_DIR_FEVEROUS = ['/home/bussotti/XFCresults/']
-    DATASET_DIR = ['/home/bussotti/XFCresults/datasets']
-    POLITIHOP_DS_DIR = ['/home/bussotti/XFCresults/datasets/politihop']
-    LIARPLUS_DS_DIR = ['/home/bussotti/XFCresults/datasets/LIARPLUS']
+    DATASET_DIR_FEVEROUS = '/home/bussotti/XFCresults/'
+    DATASET_DIR = '/home/bussotti/XFCresults/datasets'
+    DATASET_DIR_V2 = BASE_DIR_V2 + 'datasets'
+    DATASET_DIR_V3 = BASE_DIR_V2 + 'datasets/data'
+    POLITIHOP_DS_DIR = '/home/bussotti/XFCresults/datasets/politihop'
+    LIARPLUS_DS_DIR = '/home/bussotti/XFCresults/datasets/LIARPLUS'
     BASE_CONFIG = dict(results_dir=RESULTS_DIR, random_seed=[1], )
     ROBERTA_V2_3L = '/home/bussotti/experiment_AE/0824_explainer_newmodel/llama318b_feverousobj5trained_10epochs_3labels/adapter_config.json'
     RANDOM_SEEDS_v1 = dict(random_seed=[2, 3, 4, 5, 6])
@@ -103,6 +110,31 @@ class C:
                                 ],
                                 nrows=[3]),
                             )
+    scifact_1k = dict(dataset_name='SciFact',
+                      dataset_params=dict(dataset_dir=ospj(DATASET_DIR_V3, 'scifact/converted/'),
+                                          dataset_file=['dev_k20_mink5.json', ], nrows=1000))
+    scifact_xs = copy.deepcopy(scifact_1k)
+    scifact_xs['dataset_params'].update(nrows=3)
+    scifact_s = copy.deepcopy(scifact_1k)
+    scifact_s['dataset_params'].update(nrows=10)
+
+    fm2_1k = dict(dataset_name='FM2',
+                  dataset_params=dict(dataset_dir=ospj(DATASET_DIR_V3, 'FM2/converted/'),
+                                      dataset_file=['dev.json'], nrows=1000),
+                  )
+    fm2_xs = copy.deepcopy(fm2_1k)
+    fm2_xs['dataset_params'].update(nrows=3)
+
+    f3l_1k = dict(dataset_name='feverous3l',
+                  dataset_params=dict(dataset_dir=ospj(DATASET_DIR_V3, 'feverous/converted'),
+                                      dataset_file='test_2labels_from5-5-3-dev.json',
+                                      nrows=1000),
+                  )
+    f2l_1k = dict(dataset_name='feverous2l',
+                  dataset_params=dict(dataset_dir=ospj(DATASET_DIR_V3, 'feverous/converted'),
+                                      dataset_file='test_from5-5-3-dev.json',
+                                      nrows=1000),
+                  )
 
     not_precomputed_datasets_conf_10 = dict(dataset_name='feverous',
                                             dataset_params=dict(
@@ -128,73 +160,87 @@ class C:
                 '/homes/bussotti/feverous_work/feverousdata/modeloriginalfeverousforandrea/feverous_verdict_predictor']),
     )
 
-    llama3_1_v0 = dict(
-        model_name=['LLAMA3_1'],
-        model_params=dict(
-            base_model_name="meta-llama/Meta-Llama-3.1-8B",
-            # model_path=[ ]
-        ),
-    )
-
-    lime_only_ev = dict(explainer_name=['lime'],
-                        explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[500], ),
+    llama3_1_v0 = dict(model_name=['LLAMA3_1'],
+                       model_params=dict(base_model_name="meta-llama/Meta-Llama-3.1-8B", ),
+                       )
+    pepa_scifact = dict(model_name='GenFCExp',
+                        model_params=dict(model_path=ospj(MODELS_DIR_V2, 'Isabelle/scifact/isabelle_k20_mink5.pt'), ),
                         )
-    lime_only_ev_250 = dict(explainer_name=['lime'],
-                            explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[250], ),
-                            )
+    pepa_fm2 = dict(model_name=['GenFCExp'],
+                    model_params=dict(model_path=ospj(MODELS_DIR_V2, 'Isabelle/FM2/isabelle.pt'), ),
+                    )
 
-    lime_only_ev_50 = dict(explainer_name=['lime'],
-                           explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[50], ),
-                           )
-    lime_only_ev_stability_s = dict(explainer_name=['lime'],
-                                    explainer_params=dict(perturbation_mode=['only_evidence'],
-                                                          num_samples=[16, 32, 64], ),
-                                    )
+    roberta_base = dict(model_name=['Roberta'], model_params=dict(), )
+    roberta_sci_fact = copy.deepcopy(roberta_base)
+    roberta_sci_fact['model_params'].update(
+        model_path=ospj(MODELS_DIR_V2, 'feverous/Scifact'),
+        nb_label=3,
+    )
+    roberta_fm2 = du(roberta_base, dict(model_params=dict(
+        model_path=ospj(MODELS_DIR_V2, 'feverous/FM2/checkpoint-9991'),
+        nb_lable=2)))
 
-    lime_only_ev_stability = dict(explainer_name=['lime'],
-                                  explainer_params=dict(perturbation_mode=['only_evidence'],
-                                                        num_samples=[16, 32, 64, 128, 256, 512], ),
-                                  )
+    roberta_f2l = du(roberta_base, dict(model_params=dict(
+        nb_label=2,
+        model_path=ospj(MODELS_DIR_V2, 'feverous/feverous/fromfevtrain_2labels_from5-5-3-dev/checkpoint-3566')
+    )))
+
+    roberta_f3l = copy.deepcopy(roberta_base)
+    roberta_f3l['model_params'].update(
+        nb_label=3,
+        model_path=ospj(MODELS_DIR_V2, 'feverous/feverous/fromfevtrain_2labels_from5-5-3-dev/checkpoint-3566'))
+
+    exp_class_names_2l = dict(explainer_params=dict(class_names=[('SUPPORTS', 'REFUTES')]))
+    lime_only_ev = dict(explainer_name=['lime'],
+                        explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=[500],
+                                              class_names=DEF_CLASS_NAMES),
+                        )
+    lime_only_ev_250 = copy.deepcopy(lime_only_ev)
+    lime_only_ev_250['explainer_params'].update(num_samples=[250])
+
+    lime_only_ev_50 = copy.deepcopy(lime_only_ev)
+    lime_only_ev_50['explainer_params'].update(num_samples=[50])
+
+    lime_only_ev_stability_s = copy.deepcopy(lime_only_ev)
+    lime_only_ev_stability_s['explainer_params'].update(num_samples=[8, 16, 32])
+
+    lime_only_ev_stability = copy.deepcopy(lime_only_ev)
+    lime_only_ev_stability['explainer_params'].update(num_samples=[16, 32, 64, 128, 256, 512])
 
     shap_only_ev = dict(explainer_name=['shap'],
                         explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
-                                              num_samples=[500], ),
+                                              num_samples=[500],
+                                              class_names=DEF_CLASS_NAMES),
                         )
-    shap_only_ev_250 = dict(explainer_name=['shap'],
-                            explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
-                                                  num_samples=[250], ),
-                            )
+    shap_only_ev_250 = copy.deepcopy(shap_only_ev)
+    shap_only_ev_250['explainer_params'].update(num_samples=[250])
 
-    shap_only_ev_50 = dict(explainer_name=['shap'],
-                           explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
-                                                 num_samples=[50], ),
-                           )
+    shap_only_ev_50 = copy.deepcopy(shap_only_ev)
+    shap_only_ev_50['explainer_params'].update(num_samples=[50])
 
-    shap_only_ev_stability = dict(explainer_name=['shap'],
-                                  explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
-                                                        num_samples=[16, 32, 64, 128, 256, 512], ),
-                                  )
+    shap_only_ev_stability = copy.deepcopy(shap_only_ev)
+    shap_only_ev_stability['explainer_params'].update(num_samples=[16, 32, 64, 128, 256, 512])
 
     n_perturb_time = [int(x) for x in (2 ** np.arange(5, 13 + 1))]
-    lime_only_ev_time = dict(explainer_name=['lime'],
-                             explainer_params=dict(perturbation_mode=['only_evidence'], num_samples=n_perturb_time, ),
-                             )
-    lime_only_ev_time_v2_s = dict(explainer_name=['lime'],
-                                  explainer_params=dict(perturbation_mode=['only_evidence'],
-                                                        num_samples=n_perturb_time[:3], ),
-                                  )
-    shap_only_ev_time = dict(explainer_name=['shap'],
-                             explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
-                                                   num_samples=n_perturb_time, ),
-                             )
-    shap_only_ev_time_v2_s = dict(explainer_name=['shap'],
-                                  explainer_params=dict(perturbation_mode=['only_evidence'], mode=['KernelExplainer'],
-                                                        num_samples=n_perturb_time[:3], ),
-                                  )
+
+    lime_only_ev_time = copy.deepcopy(lime_only_ev)
+    lime_only_ev_time['explainer_params'].update(num_samples=n_perturb_time)
+
+    lime_only_ev_time_v2_s = copy.deepcopy(lime_only_ev)
+    lime_only_ev_time_v2_s['explainer_params'].update(num_samples=n_perturb_time[:3])
+
+    shap_only_ev_time = copy.deepcopy(shap_only_ev)
+    shap_only_ev_time['explainer_params'].update(num_samples=n_perturb_time)
+
+    shap_only_ev_time_v2_s = copy.deepcopy(shap_only_ev)
+    shap_only_ev_time_v2_s['explainer_params'].update(num_samples=n_perturb_time[:3])
+
     claim_only_explainer = dict(explainer_name=['claim_only_pred'], explainer_params=dict(), )
 
 
-REQUIRED_FIELDS = ['experiment_id', 'dataset_name', 'model_name', 'explainer_name']
+REQUIRED_FIELDS = ['experiment_id', 'dataset_name', 'model_name', 'explainer_name',
+                   'dataset_params.dataset_file'  # will be used to identify the dataset
+                   ]
 
 experiment_definitions_list = [
     dict(experiment_id='sk_f_jf_1.0', ) | C.BASE_CONFIG |
@@ -354,4 +400,41 @@ experiment_definitions_list = [
 
     dict(experiment_id='st_1.2', ) | C.BASE_CONFIG | C.RANDOM_SEEDS_v1 |
     C.baseline_feverous_model | C.shap_only_ev_stability | C.feverous_ds_100,
+
+    # NEW DATASETS
+    # FEVEROUS 2 label
+    du(dict(experiment_id='fv_f2l_1.0', ), C.BASE_CONFIG,
+       C.roberta_f2l, C.lime_only_ev, C.f2l_1k, C.exp_class_names_2l),
+
+    du(dict(experiment_id='fv_f2l_2.0', ), C.BASE_CONFIG,
+       C.roberta_f2l, C.shap_only_ev, C.f2l_1k, C.exp_class_names_2l),
+
+    # FEVEROUS 3 label
+    dict(experiment_id='fv_f3l_1.0', ) | C.BASE_CONFIG |
+    C.roberta_f3l | C.lime_only_ev | C.f3l_1k,
+
+    dict(experiment_id='fv_f3l_2.0', ) | C.BASE_CONFIG |
+    C.roberta_f3l | C.shap_only_ev | C.f3l_1k,
+
+    # scifact
+    dict(experiment_id='fv_sf_1.0', ) | C.BASE_CONFIG |
+    C.roberta_sci_fact | C.lime_only_ev | C.scifact_1k,
+
+    dict(experiment_id='fv_sf_2.0', ) | C.BASE_CONFIG |
+    C.roberta_sci_fact | C.shap_only_ev | C.scifact_1k,
+
+    dict(experiment_id='fv_sf_1.0test', ) | C.BASE_CONFIG |
+    C.roberta_sci_fact | C.lime_only_ev_50 | C.scifact_s,
+
+    dict(experiment_id='gfce_sf_1.1test', ) | C.BASE_CONFIG |
+    C.pepa_scifact | C.lime_only_ev_50 | C.scifact_xs,
+
+    # FM2
+    du(dict(experiment_id='fv_fm_1.0', ), C.BASE_CONFIG,
+       C.roberta_sci_fact, C.lime_only_ev, C.fm2_1k, C.exp_class_names_2l),
+    du(dict(experiment_id='fv_fm_2.0', ), C.BASE_CONFIG,
+       C.roberta_sci_fact, C.shap_only_ev, C.fm2_1k, C.exp_class_names_2l),
+
+    du(dict(experiment_id='fv_fm_1.0test', ), C.BASE_CONFIG,
+       C.roberta_sci_fact, C.lime_only_ev_50, C.fm2_xs, C.exp_class_names_2l),
 ]

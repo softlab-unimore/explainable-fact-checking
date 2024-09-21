@@ -242,6 +242,11 @@ experiment_done = [
     'lla_fv_1.2',
 ]
 
+exp_to_analyse = [
+    'fv_fm_1.0',
+    'fv_fm_2.0',
+]
+
 experiments_doing = [
 ]
 
@@ -256,8 +261,15 @@ test_conf = [
 if __name__ == "__main__":
 
     experiments_to_run = [
-        'st_1.1',
-        'st_1.2',
+        'fv_f2l_1.0',
+        'fv_sf_1.0',
+        'fv_sf_2.0',
+        'fv_f3l_1.0',
+        'fv_f2l_2.0',
+        'fv_f3l_2.0',
+        # 'gfce_sf_1.1test',
+        # 'st_1.1',
+        # 'st_1.2',
         # 'lla_np_1.test',
     ]
 
