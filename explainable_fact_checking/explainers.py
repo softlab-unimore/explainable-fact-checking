@@ -65,7 +65,8 @@ class LimeXFCAdapter:
 
 
 class ShapXFCAdapter:
-    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, wrapper_params=None, class_names=None):
+    def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, wrapper_params=None,
+                 class_names=None):
         if class_names is None:
             class_names = explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0
         if wrapper_params is None:
@@ -141,6 +142,7 @@ class ShapXFCAdapter:
             claim=xfc_wrapper.claim,
             id=xfc_wrapper.get_id(),
             label=record['label'],
+            class_names=self.class_names,
             record=record,
             execution_time=explanation_time,
             predict_proba=predict_proba,

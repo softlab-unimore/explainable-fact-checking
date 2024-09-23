@@ -20,7 +20,7 @@ class C:  # general costants
 # Root directory
 base_path = '/homes/bussotti/feverous_work/feverousdata'
 
-class_names_load = ['NOT ENOUGH INFO', 'SUPPORTS', 'REFUTES']
+class_names_load = ['NEI', 'SUPPORTS', 'REFUTES']
 
 
 # st.t.interval(0.95, len(a)-1, loc=np.mean(a), scale=st.sem(a))
