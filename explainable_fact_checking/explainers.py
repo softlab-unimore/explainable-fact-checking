@@ -16,11 +16,12 @@ import explainable_fact_checking.experiment_definitions
 
 
 class LimeXFCAdapter:
-    def __init__(self, perturbation_mode, num_samples=50, random_seed=42, wrapper_params=None, class_names=None):
+    def __init__(self, perturbation_mode, num_samples=50, random_seed=42, wrapper_params=None, class_names=None,
+                 ):
         if wrapper_params is None:
             wrapper_params = {}
         if class_names is None:
-            class_names = explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0
+            class_names = explainable_fact_checking.experiment_definitions.E.CLASS_NAMES_V0
         self.num_samples = num_samples
         self.perturbation_mode = perturbation_mode
         self.random_seed = random_seed
@@ -68,7 +69,7 @@ class ShapXFCAdapter:
     def __init__(self, perturbation_mode, mode='KernelExplainer', num_samples=50, random_seed=42, wrapper_params=None,
                  class_names=None):
         if class_names is None:
-            class_names = explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0
+            class_names = explainable_fact_checking.experiment_definitions.E.CLASS_NAMES_V0
         if wrapper_params is None:
             wrapper_params = {}
         self.num_samples = num_samples
@@ -104,6 +105,7 @@ class ShapXFCAdapter:
             exp = explainer.shap_values(
                 X,
                 nsamples=self.num_samples if self.num_samples is not None else "auto",
+                silent=True,
             )
             b = datetime.now()
         elif self.mode == 'Permutation':
@@ -157,10 +159,12 @@ class ShapXFCAdapter:
         return exp_dict
 
 
-class OnlyClaimPredictor:
-
-    def __init__(self, random_seed=42):
+class OnlyClaimPredictorFeverous:
+    def __init__(self, random_seed=42, class_names=None):
         self.random_seed = random_seed
+        if class_names is None:
+            raise ValueError("class_names must be provided")
+        self.class_names = class_names
 
     def explain_list(self, record_list, predict_method):
         for record in record_list:
@@ -168,11 +172,41 @@ class OnlyClaimPredictor:
             # delete the input_txt_to_use field if present
             if 'input_txt_to_use' in record:
                 del record['input_txt_to_use']
-        predictions = predict_method.predict_legacy(record_list)
+        predictions = predict_method(record_list)
         full_predictions = predict_method.predictions
         for record, pred in zip(record_list, full_predictions):
             record['input_txt_to_use'] = pred['input_txt_model']
             record['claim'] = pred['claim']
+            record['intercept'] = record['predict_proba'] = pred['predicted_scores']
+        return record_list
+
+
+
+class OnlyClaimPredictor:
+    def __init__(self, random_seed=42, class_names=None):
+        self.random_seed = random_seed
+        if class_names is None:
+            raise ValueError("class_names must be provided")
+        self.class_names = class_names
+
+    def explain_list(self, record_list, predict_method):
+        for record in record_list:
+            record['evidence'] = []
+        predictions = predict_method(record_list)
+        for record, pred in zip(record_list, predictions):
+            record['intercept'] = record['predict_proba'] = pred['predicted_scores']
+        return record_list
+
+class PlainPrediction:
+    def __init__(self, random_seed=42, class_names=None):
+        self.random_seed = random_seed
+        if class_names is None:
+            raise ValueError("class_names must be provided")
+        self.class_names = class_names
+
+    def explain_list(self, record_list, predict_method):
+        predictions = predict_method(record_list)
+        for record, pred in zip(record_list, predictions):
             record['intercept'] = record['predict_proba'] = pred['predicted_scores']
         return record_list
 
@@ -182,4 +216,8 @@ explainer_factory = xfc.xfc_utils.GeneralFactory()
 # Register the explainers
 explainer_factory.register_creator('lime', LimeXFCAdapter)
 explainer_factory.register_creator('shap', ShapXFCAdapter)
-explainer_factory.register_creator('claim_only_pred', OnlyClaimPredictor)
+explainer_factory.register_creator('claim_only_pred', OnlyClaimPredictorFeverous)
+explainer_factory.register_creator('claim_only_pred_general', OnlyClaimPredictor)
+explainer_factory.register_creator('plain_pred', PlainPrediction)
+
+
