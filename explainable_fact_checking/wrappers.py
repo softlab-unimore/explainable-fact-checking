@@ -62,7 +62,7 @@ class ModelWrapper:
     reference_record = {}
 
 
-    def __init__(self, record, predictor, separator=r' </s> ', perturbation_mode='only_evidence', explainer='lime', debug=False):
+    def __init__(self, record, predictor, separator=r'</s>', perturbation_mode='only_evidence', explainer='lime', debug=False, input_format='dict'):
         self.record = record
         self.separator = separator
         self.predict_method = predictor
@@ -72,15 +72,15 @@ class ModelWrapper:
         self.claim = record['claim']
         self.evidence_array = np.array(self.generate_evidence_list(record))
         self.evidence_index_map = self.generate_evidence_index_map(self.evidence_array)
-        self.mode = self.determine_mode()
+        self.mode = self.determine_mode(input_format)
         self.params_to_report = {}
         self.debug = debug
         if self.debug:
             self.debug_data = {}
 
-        if self.mode == C.EV_KEY:
+        if self.mode == 'string':
             self.restructure_records = self.restructure_records_strings
-        elif self.mode == 'normal':
+        elif self.mode == 'dict':
             self.restructure_records = self.restructure_records_dict
 
         if explainer == 'shap':
@@ -101,13 +101,18 @@ class ModelWrapper:
         if self.explainer not in ['shap', 'lime']:
             raise ValueError('Explainer not recognized. Choose between shap and lime.')
 
-    def determine_mode(self):
+    def determine_mode(self, input_format=None):
+        if input_format is not None:
+            if input_format not in ['dict', 'string']:
+                raise ValueError('Input format not recognized. Choose between ["dict", "string"]')
+            return input_format
+
         record = self.record
         if C.TXT_TO_USE in record:
             assert self.claim == record[C.TXT_TO_USE].split(self.separator)[0], 'Claim and input_txt_to_use do not match'
         elif C.EV_KEY in record:
-            return C.EV_KEY
-        return 'normal'
+            return 'dict' # C.EV_KEY
+        return 'dict'
 
     def select_text_perturbation(self, perturbation_mode):
         modes = {
@@ -169,7 +174,6 @@ class ModelWrapper:
         for i, (ev, turn_record) in enumerate(zip(perturbed_item_list, perturbed_record_list)):
             evidence_list = self.reconstruct_evidence_list(ev)
             turn_record['id'] = i
-            turn_record['evidence'] = evidence_list
             self.set_evidence(turn_record, evidence_list)
         return perturbed_record_list
 
@@ -203,3 +207,4 @@ class ModelWrapper:
 
     def set_evidence(self, record, evidence_list):
         record[C.TXT_TO_USE] = self.separator.join([self.claim] + evidence_list)
+        record[C.EV_KEY] = evidence_list

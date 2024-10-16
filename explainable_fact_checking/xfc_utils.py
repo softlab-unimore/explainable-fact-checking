@@ -11,7 +11,7 @@ import scipy.stats as st
 class C:  # general costants
     KEYS_TEXT = 'list_keys_and_text_in_order'
     TXT_TO_USE = 'input_txt_to_use'
-    EV_KEY = 'evidence_txt_list'
+    EV_KEY = 'evidence' # 'evidence_txt_list'
     COLUMNS_MAP = {'article_id': 'id',
                    'statement': 'claim', 'ruling': EV_KEY,
                    'annotated_label': 'label'}
