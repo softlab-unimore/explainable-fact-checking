@@ -1,11 +1,124 @@
+import copy
+import json
+import os
+import pickle
 import jsonlines
+import numpy as np
+import itertools as it
+
+from explainable_fact_checking.charts.explanations_loader import swapped_experiments
+import explainable_fact_checking as xfc
+
+
+if __name__ == '__main__':
+    # SWAPPING THE ORDER OF THE CLASSES FOR SOME EXPERIMENTS THAT WERE TRAINED WITH A DIFFERENT ORDER
+    for exp in swapped_experiments:
+        # scan the directory. In each subfolder there is a json file with the params and a pkl file with the results
+        # create a list of results containing in each item a pair of params and the results
+        full_experiment_path = os.path.join(xfc.experiment_definitions.E.RESULTS_DIR, exp)
+        old_path = full_experiment_path.replace(exp, exp + '_old')
+        if os.path.exists(old_path):
+            full_experiment_path = old_path
+        else:
+            # copy the full directory to a new directory with the suffix '_old'
+            os.makedirs(old_path, exist_ok=True)
+            os.system(f'cp -r {full_experiment_path}/* {old_path}')
+            full_experiment_path = old_path
+
+        assert pickle.load(open(list(os.scandir(list(os.scandir(old_path))[0]))[1], 'rb')) is not None, 'Results not loaded correctly'
+        results_list = []
+        for folder in os.scandir(full_experiment_path):
+            if not folder.is_dir():
+                continue
+            params, results = None, None
+            for file in os.scandir(folder):
+                if file.name.endswith('.json'):
+                    with open(file, 'r') as f:
+                        params = json.load(f)
+                elif file.name.endswith('.pkl'):
+                    with open(file, 'rb') as f:
+                        results = pickle.load(f)
+            num_labels = params['model_params']['nb_label']
+            if num_labels == 2:
+                continue
+            if num_labels == 3:
+                universal_to_feverous = {1: 0, 2: 1, 0: 2}
+                feverous_to_universal = {0: 1, 1: 2, 2: 0}
+
+            elif num_labels == 2:
+                universal_to_feverous = {i: i for i in range(7)}
+                feverous_to_universal = {i: i for i in range(7)}
+            else:
+                universal_to_feverous = {1: 0, 2: 1, 0: 2} | {i: i for i in range(3, 7)}
+                feverous_to_universal = {0: 1, 1: 2, 2: 0} | {i: i for i in range(3, 7)}
+            if isinstance(results[0], dict):
+                get_method = lambda exp_instance, key: exp_instance.get(key, None)
+                set_method = lambda exp_instance, key, value: exp_instance.update({key: value})
+            else:
+                get_method = lambda exp_instance, key: getattr(exp_instance, key) if hasattr(exp_instance, key) else None
+                set_method = lambda exp_instance, key, value: setattr(exp_instance, key, value)
+
+            y_true = np.array([get_method(x, 'label') for x in results])
+            y_pred_proba = np.array([get_method(x, 'predict_proba') for x in results])
+            y_pred_int = np.argmax(y_pred_proba, axis=1)
+            # all order permutations of the classes
+            order_permutation = list(it.permutations(range(num_labels)))
+            acc_dict = {}
+            for order in order_permutation:
+                y_pred_int_v2 = np.argmax(y_pred_proba[:, order], axis=1)
+                acc = np.mean(y_true == y_pred_int_v2)
+                acc_dict[order] = acc
+            order_v1 = [universal_to_feverous[universal_to_feverous[i]] for i in range(num_labels)]
+            order_v2 = [universal_to_feverous[i] for i in range(num_labels)]
+            # order with max accuracy
+            order = max(acc_dict, key=acc_dict.get)
+
+            new_results = copy.deepcopy(results)
+            for i, x in enumerate(new_results):
+                xold = results[i]
+                set_method(x, 'predict_proba', get_method(xold, 'predict_proba')[[order]][0])
+
+                old_v = get_method(xold, 'intercept')
+                new_intercept = {new_class: old_v[old_idx] for new_class, old_idx in enumerate(order)}
+                set_method(x, 'intercept', new_intercept)
+
+                old_v = get_method(xold, 'local_exp')
+                new_local_exp = {new_class: old_v[old_idx] for new_class, old_idx in enumerate(order)}
+                set_method(x, 'local_exp', new_local_exp)
+            new_acc = np.mean(y_true == np.argmax(np.array([get_method(x, 'predict_proba') for x in new_results]), axis=1))
+            if list(order) not in [order_v1, order_v2]:
+                if order == (0, 1, 2):
+                    print('Order already OK')
+                    continue
+                raise ValueError('Order not in the possible orders')
+
+            assert new_acc == acc_dict[order], 'Accuracy not the same'
+            # save the new results in a new folder with the same name as the original folder with the suffix '_swapped'
+            new_folder = folder.path.replace('_old', '').replace(exp, exp + '_swapped')
+            # delete new folder if it already exists
+            if os.path.exists(new_folder):
+                try:
+                    for file in os.scandir(new_folder):
+                        os.remove(file)
+                    os.rmdir(new_folder, )
+                except Exception as e:
+                    print(f'Error deleting folder: {e}')
+            assert not os.path.exists(new_folder), 'Folder not deleted correctly'
+
+            new_folder = folder.path.replace('_old', '')
+            os.makedirs(new_folder, exist_ok=True)
+            with open(os.path.join(new_folder, 'params.json'), 'w') as f:
+                json.dump(params, f)
+            with open(os.path.join(new_folder, 'results.pkl'), 'wb') as f:
+                pickle.dump(new_results, f)
+
 
 # t = record.copy()
 # del t['input_txt_to_use']
 # predictor([t])
 
 
-[l for l in jsonlines.open(data_path + "/" + dev_test, "r")]
+# [l for l in jsonlines.open(data_path + "/" + dev_test, "r")]
 
 
 # Get length of the list of dictionaries
