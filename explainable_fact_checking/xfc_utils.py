@@ -15,7 +15,7 @@ class C:  # general costants
     COLUMNS_MAP = {'article_id': 'id',
                    'statement': 'claim', 'ruling': EV_KEY,
                    'annotated_label': 'label'}
-
+    CLASS_MAP = {'Refuted': 'REFUTES', 'Supported': 'SUPPORTS', 'Not Enough Evidence': 'NEI', 'Conflicting Evidence/Cherrypicking': 'CEP'}
 
 # Root directory
 base_path = '/homes/bussotti/feverous_work/feverousdata'
@@ -153,6 +153,18 @@ def init_logger(save_dir: str) -> logging.Logger:
 
     return logger
 
+# class logger singleton pattern
+class LoggerSingleton:
+    _instance = None
+
+    def __new__(cls, reset=False, *args, **kwargs):
+        if not cls._instance or reset:
+            cls._instance = init_logger(*args, **kwargs)
+        return cls._instance
+
+
+
+
 
 def handle_exception(e, logger):
     """
@@ -194,6 +206,9 @@ class GeneralFactory:
         creator = self._creators[name]
         return creator(**kwargs)
 
+    def get_available_keys(self):
+        return self._creators.keys()
+
 
 def batched(iterable, n):
     # batched('ABCDEFG', 3) → ABC DEF G
@@ -206,3 +221,19 @@ def batched(iterable, n):
 
 def is_debugging():
     return hasattr(sys, 'gettrace') and sys.gettrace() is not None
+
+def ordered_set(l):
+    """
+    Create an ordered set from the input arguments.
+
+    Parameters
+    ----------
+    l : list
+        The input arguments to be used to create the ordered set.
+
+    Returns
+    -------
+    list
+        The ordered set created from the input arguments.
+    """
+    return list(dict.fromkeys(l))
