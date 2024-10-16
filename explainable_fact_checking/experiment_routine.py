@@ -3,8 +3,11 @@ import os
 
 import pydantic.utils
 
+from explainable_fact_checking.experiment_definitions import E
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+if os.environ.get("CUDA_VISIBLE_DEVICES") is None:
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 print("CUDA_DEVICE_ORDER:", os.environ.get("CUDA_DEVICE_ORDER"))
@@ -138,16 +141,19 @@ class ExperimentRunner:
                     raise TypeError(f"Value {value} is not a valid collection")
             params_dict_to_iterate[key] = value
         os.makedirs(results_dir, exist_ok=True)
-        logger = xfc.xfc_utils.init_logger(save_dir=results_dir)
+        # logger = xfc.xfc_utils.init_logger(save_dir=results_dir)
+
+        logger = xfc.xfc_utils.LoggerSingleton(save_dir=results_dir, reset=True)
         logger.info(f"Starting experiment {experiment_id}")
         start_time = datetime.now()
-        for i, kwargs in tqdm(enumerate(self.product_dict(**params_dict_to_iterate))):
+        last_checkpoint_time = start_time
+        to_iter = list(enumerate(self.product_dict(**params_dict_to_iterate)))
+        for i, kwargs in to_iter:
             gc.collect()
             logger.info(f"Iteration: {i} with parameters: ")
             print(json.dumps(kwargs, indent=4, sort_keys=True))
             kwargs = copy.deepcopy(kwargs)
             kwargs['results_dir'] = os.path.join(results_dir, str(i))
-            turn_a = datetime.now()
 
             try:
                 self.launch_single_experiment(**kwargs, logger=logger)
@@ -159,8 +165,19 @@ class ExperimentRunner:
                     pass
                 elif gettrace():
                     raise e
-            turn_b = datetime.now()
-            logger.info(f"Iteration: {i} completed in {turn_b - turn_a}")
+
+            actual_time = datetime.now()
+            tot_avg = (actual_time - start_time) / (i + 1)
+            tot_remaining = tot_avg * (len(to_iter) - i - 1)
+
+            checkpoint_avg = (actual_time - last_checkpoint_time) / (i + 1)
+            remaining_checkpoint = checkpoint_avg * (len(to_iter) - i - 1)
+            # logger.info(f"Saved {i + 1} explanations. AVG s/it (tot): {tot_avg} (- {tot_remaining}) "
+            #             f"| last AVG s/it: {checkpoint_avg} (- {remaining_checkpoint})")
+            logger.info(
+                f"Experiment it {i} completed in {actual_time - last_checkpoint_time} | AVG s/it: {tot_avg} (- {tot_remaining})"
+                f" | last AVG s/it: {checkpoint_avg} (- {remaining_checkpoint})")
+            last_checkpoint_time = actual_time
         end_time = datetime.now()
         logger.info(f"Experiment {experiment_id} completed in {end_time - start_time}")
 
@@ -196,6 +213,10 @@ class ExperimentRunner:
             except Exception as e:
                 xfc.xfc_utils.handle_exception(e, logger)
         else:
+            logger.info(f"Total records: {len(dataset)}")
+            start_time = datetime.now()
+            last_checkpoint_time = start_time
+            checkpoint_each = 10
             for i, record in tqdm(enumerate(dataset)):
                 try:
                     exp = explainer.explain(record=record, predictor=model)
@@ -204,9 +225,20 @@ class ExperimentRunner:
                     logger.error(f"Error in record {i}")
                     xfc.xfc_utils.handle_exception(e, logger)
 
-                if i % 10 == 0:
+                if (i + 1) % checkpoint_each == 0:
                     with open(os.path.join(results_dir, 'explanation_list.pkl'), 'wb') as file:
                         pickle.dump(exp_list, file)
+                if ((i + 1) % checkpoint_each == 0) or (i == 0) or (i == len(dataset) - 1):
+                    actual_time = datetime.now()
+                    tot_avg = (actual_time - start_time) / (i + 1)
+                    tot_remaining = tot_avg * (len(dataset) - i - 1)
+
+                    checkpoint_avg = (actual_time - last_checkpoint_time) / min(checkpoint_each, i + 1)
+                    remaining_checkpoint = checkpoint_avg * (len(dataset) - i - 1)
+                    logger.info(f"Saved {i + 1} explanations. AVG s/it (tot): {tot_avg} (- {tot_remaining}) "
+                                f"| last AVG s/it: {checkpoint_avg} (- {remaining_checkpoint})")
+                    last_checkpoint_time = actual_time
+            logger.info(f"Saved {len(dataset)} explanations")
         with open(os.path.join(results_dir, 'explanation_list.pkl'), 'wb') as file:
             pickle.dump(exp_list, file)
 
@@ -245,24 +277,98 @@ experiment_done = [
     'lla_fv_1.0',
     'lla_fv_1.1',
     'lla_fv_1.2',
+
 ]
 
 exp_to_analyse = [
+    'fv_sf_1.0',
+    'fv_sf_2.0',
+    'fv_f2l_1.0',
+    'fv_f2l_2.0',
+    'fv_f3l_1.0',
+    'fv_f3l_2.0',
+    'r2_fv_f2l_1.0',
+    'r2_fv_f2l_2.0',
+    'r2_fv_f3l_1.0',
+    'r2_fv_f3l_2.0',
+    'r2_fv_sf_1.0',
+    'r2_fv_sf_2.0',
+    'fv_fm_1.0',
+    'fv_fm_2.0',
+    'r2_fv_fm_1.0',
+    'r2_fv_fm_2.0',
+
+    'fv_av_1.0',
+    'fv_av_2.0',
+
+    'gfce_f2l_1.0',
+    'gfce_f2l_2.0',
+    'gfce_f3l_1.0',  # OK 4:27h
+    'gfce_fm2_1.0',  # OK 4:29h
+    'gfce_sf_1.0',  # OK 1:10h
+    'gfce_f3l_1.1',  # 4:49h
+    'gfce_sf_2.1',  # 5:34h
+    'gfce_sf_1.1',  # 1:10h
+    'gfce_f3l_2.0',  # 22:25h
+    'gfce_f3l_2.1',  # 22:52h
+
+    'gfce_f3l_1.1F',  # 12:17h
+    'gfce_sf_1.1F',  # 3:09h
+    'gfce_av_1.0F',  # 8:00h
+    'gfce_av_2.0',  # 13:55h
+    'gfce_av_1.0',  # 2:55h
+
+    'fv_f2lF_1.0',
+    'fv_f2lF_2.0',
+    'fv_f3lF_1.0',
+    'fv_f3lF_2.0',
+
+    'r2_fv_f2lF_1.0',
+    'r2_fv_f2lF_2.0',
+    'r2_fv_f3lF_1.0',
+    'r2_fv_f3lF_2.0',
+
+    'gfce_f2l_1.1',  # pepa 3
+    'gfce_f2l_2.1',  # pepa 4
+    'r2_fv_sf_1.0',
+    'r2_fv_sf_2.0',
+    'gfce_fm2_1.1',  # pepa 1
+    'gfce_fm2_2.1',  # pepa 2
+
+    'llama70b_f2l_1.0',  # 10:43h # bad version
+
+    'llama70b_fm2_1.0',  # 18:40h
+    'llama70b_fm2_2.0',
+    'llama70b_sf_1.0',
+    'llama70b_sf_2.0',
+    'llama70b_av_1.0',
+    'llama70b_av_2.0',
+    'llama70b_f3l_1.0',
+    'llama70b_f3l_2.0',  # 17:45h
+    'llama70b_f2l_2.1',
+    'llama70b_f2l_1.1',  # 8:17h
+    'gfce_fm2_2.2',
+    'gfce_fm2_1.2',
 ]
 
 experiments_doing = [
-        'fv_f2l_1.0',
-        'fv_fm_1.0',
-        'fv_fm_2.0',
-        'fv_sf_1.0',
-        'fv_sf_2.0',
-        'fv_f3l_1.0',
-        'fv_f2l_2.0',
-        'fv_f3l_2.0',
+
+    # ABB
+
+    # ABC GPU 0
+
+    # ABD GPU 0
+
+    # ABE GPU 0
+    # ABC GPU 0
+
+    # ABF GPU 0
+
+    # ABG GPU 2
+
 ]
 
 test_conf = [
-
     'st_1.0',
     'lla_np_1.test',
     'sms_p_1.0',
@@ -273,7 +379,10 @@ if __name__ == "__main__":
 
     experiments_to_run = [
 
-        # 'gfce_sf_1.1test',
+        # 'fv_sf_1.0test',
+
+        # 'fv_f2l_3.0',
+
         # 'st_1.1',
         # 'st_1.2',
         # 'lla_np_1.test',
@@ -287,7 +396,16 @@ if __name__ == "__main__":
         # if debug mode create additional params
         if xfc.xfc_utils.is_debugging():
             print(f"Running experiment {exp_id} in debug mode")
-            additional_params = dict(dataset_params=dict(nrows=5))
+            additional_params = pydantic.utils.deep_update({'dataset_params': {'nrows': 5, 'skiprows': 100},
+                                                            # 'model_params': {
+                                                            #     'cache_pred_file': None,
+                                                            # },
+
+                                                            'explainer_params': {
+                                                                'num_samples': [50]
+                                                            },
+                                                            },  # E.plain_pred_exp
+                                                           )
         else:
             additional_params = None
         experiment_runner.launch_experiment_by_id(exp_id, additional_params=additional_params)
