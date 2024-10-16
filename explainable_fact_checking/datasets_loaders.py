@@ -96,7 +96,7 @@ class AddInputTxtToUse:
         """
         # default model
         model = xfc.FeverousModelAdapter(
-            model_path=xfc.experiment_definitions.C.baseline_feverous_model['model_params']['model_path'][
+            model_path=xfc.experiment_definitions.E.baseline_feverous_model['model_params']['model_path'][
                 0])
         with open(input_file, 'r') as f_in:
             record_list = [json.loads(line) for line in f_in]
@@ -302,20 +302,40 @@ class LIARPlusDatasetLoader(GeneralDatasetLoader):
 
 dataset_loader_factory.register_creator('LIARPlus', LIARPlusDatasetLoader().load)
 
+class RobertaTokenizerWrapper():
+    def __init__(self, max_length=512):
+        self.max_length = max_length
+        self.tokenizer = AutoTokenizer.from_pretrained('ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli')
+
+    def preprocess_function(self, examples):
+        return self.tokenizer(examples["text"], truncation=False, padding='max_length', max_length=512)
+
+    def ntokens(self, txt):
+        return len(self.tokenizer(txt)['input_ids']) -1 # minus 1 because of the 2 </s> <s> tokens
+
+    def strucutre(self, claim, evidence_list):
+        txt = claim + '</s>' + '</s>'.join(evidence_list)
+        # remove double spaces and spaces at the beginning and end
+        txt = ' '.join(txt.split())
+        return txt
+
+
+    def __call__(self, *args, **kwargs):
+        return self.tokenizer(*args, **kwargs)
+
+
+
 def load_std_dataset(dataset_dir, dataset_file, nrows=None, skiprows=None, **kwargs):
     input_file = os.path.join(dataset_dir, dataset_file)
     with open(input_file) as f:
         obj_tr = json.load(f)
-    tokenizer = AutoTokenizer.from_pretrained('ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli')
 
-    def preprocess_function(examples):
-        return tokenizer(examples["text"], truncation=False, padding='max_length', max_length=512)
 
     train_list = {'text': [], 'label': [], 'evs_labels': [], 'ids': []}
     for elt in obj_tr:
         claim_and_ev = elt['claim']
         for ev in elt['evidence']:
-            claim_and_ev += ' </s> ' + ev
+            claim_and_ev += '</s>' + ev
         train_list['text'] += [claim_and_ev]
         train_list['label'] += [elt['label']]
         train_list['evs_labels'] += [elt['goldtag']]
@@ -324,6 +344,9 @@ def load_std_dataset(dataset_dir, dataset_file, nrows=None, skiprows=None, **kwa
     dataset_dict = DatasetDict({
         'train': train_dataset,
     })
+    tokenizer = AutoTokenizer.from_pretrained('ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli')
+    def preprocess_function( examples):
+        return tokenizer(examples["text"], truncation=False, padding='max_length', max_length=512)
     dataset_dict = dataset_dict.map(preprocess_function, batched=True)
 
     def filter_long_sequences(example):
@@ -367,3 +390,9 @@ dataset_loader_factory.register_creator('SciFact', load_std_dataset)
 dataset_loader_factory.register_creator('feverous2l', load_std_dataset)
 
 dataset_loader_factory.register_creator('feverous3l', load_std_dataset)
+
+dataset_loader_factory.register_creator('feverous2l_full', load_std_dataset)
+
+dataset_loader_factory.register_creator('feverous3l_full', load_std_dataset)
+
+dataset_loader_factory.register_creator('AVERITEC', load_std_dataset)
