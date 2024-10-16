@@ -1,6 +1,6 @@
 import os
 from explainable_fact_checking import models
-from explainable_fact_checking.experiment_definitions import C
+from explainable_fact_checking.experiment_definitions import E
 from explainable_fact_checking.model_adapters.genFCExp import GenFCExp
 
 input_list = [{
@@ -414,7 +414,7 @@ input_list = [{
                       'label': 2}]
 
 def test_predict():
-    model = GenFCExp(model_path=os.path.join(C.BASE_DIR_V2, 'models/Isabelle/scifact/isabelle_k20_mink5.pt'))
+    model = GenFCExp(model_path=os.path.join(E.BASE_DIR_V2, 'models/Isabelle/scifact/isabelle_k20_mink5.pt'))
     out = model.predict(input_list, return_exp=True)
     assert len(out[0]) == len(input_list)
     assert [len(x['evidence']) for x in input_list] == [len(x) for x in out[1]]

@@ -5,9 +5,9 @@ from explainable_fact_checking import FeverousModelAdapter
 import explainable_fact_checking as xfc
 
 if __name__ == "__main__":
-    fc_model = FeverousModelAdapter(model_path=xfc.experiment_definitions.C.JF_feverous_model['model_params']['model_path'][0])
+    fc_model = FeverousModelAdapter(model_path=xfc.experiment_definitions.E.JF_feverous_model['model_params']['model_path'][0])
     predictor = fc_model.predict
-    AB_path = xfc.experiment_definitions.C.DATASET_DIR_FEVEROUS[0]
+    AB_path = xfc.experiment_definitions.E.BASE_V1[0]
 
 
     # res_wrong = xfc.explanations_load.load_experiment_result_by_code('sk_f_jf_1.1', results_path=xfc.experiment_definitions.C.RESULTS_DIR)
