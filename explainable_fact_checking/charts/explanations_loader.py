@@ -1,19 +1,21 @@
+import copy
 import json
 import os
 import pickle
 import numpy as np
 import pandas as pd
 import explainable_fact_checking as xfc
+import itertools as it
 
 
-def load_explanations_lime(dir='/homes/bussotti/feverous_work/feverousdata/AB/lime_explanations'):
+def load_explanations_lime(path='/homes/bussotti/feverous_work/feverousdata/AB/lime_explanations'):
     """
         Using pickle load the explanations by scanning directories in 'lime_explanations' folder
         For each folder create a dictionary where the key is the dataset_file_name and the value is a dictonary of explanations
         The inner dictionary has as key the name of the file and as value the explanation object.
         use scandir
     """
-    exp_dir = dir
+    exp_dir = path
     explanations = {}
     for folder in os.scandir(exp_dir):
         if not folder.is_dir():
@@ -57,7 +59,7 @@ def explanations_to_df(explanation_object_list: list):
     Create a pandas dataframe from the explanations
     input: explanations list, where each element is a pair of (params_dict, explanation_list)
     e.g. of pair: ({'experiment_id': 'sk_f_jf_1.0', 'dataset_name': 'feverous', 'random_seed': 1, 'model_name': 'default',
-    'model_params': {'model_path': 'model_path'},
+    'model_params': {mpath: mpath},
      'explainer_name': 'lime', 'dataset_params': {'dataset_dir': 'dataset_dir',
             'dataset_file_name': 'dataset_name.jsonl', 'top': 1000},
             'explainer_params': {'perturbation_mode': 'only_evidence', 'num_samples': 500}},
@@ -82,18 +84,35 @@ def explanations_to_df(explanation_object_list: list):
                 tdict['dataset_file_name'] = tdict.pop('dataset_params__dataset_file')
             else:
                 tdict['dataset_file_name'] = tdict['dataset_name']
+            if 'explainer_params__class_names' in tdict:
+                tdict['explainer_params__class_names'] = [xfc.C.CLASS_MAP.get(x, x) for x in
+                                                          tdict['explainer_params__class_names']]
+            else:
+                tdict['explainer_params__class_names'] = xfc.experiment_definitions.E.CLASS_NAMES_V0
             texp_list = explanation_to_dict_olap(explanation, tdict)
             out_list += [x | tdict for x in texp_list]
     ret_df = pd.DataFrame(out_list)
-    # convert the following columns in categorical ['type', 'dataset_file_name', 'model_path', 'model_name', 'perturbation_mode', 'mode']
+    # convert the following columns in categorical ['type', 'dataset_file_name', mpath, 'model_name', 'perturbation_mode', 'mode']
     for col in ['type', 'dataset_file_name', 'model_name', 'perturbation_mode', 'mode']:
         if col in ret_df.columns:
             ret_df[col] = ret_df[col].astype('category')
+    for col in ['goldtag']:
+        if col in ret_df.columns:
+            ret_df[col] = ret_df[col].astype('Int64')
     # sort columns
     # first ['unit_text', 'unit_index',  'SUPPORTS', 'REFUTES'] then the rest
-    columns = ['unit_text', 'unit_index',  'SUPPORTS', 'REFUTES', 'NEI']
-    columns += [x for x in ret_df.columns if x not in columns]
+    unique_cnames = set(it.chain.from_iterable(ret_df['explainer_params__class_names'].values))
+    unique_cnames = set([xfc.C.CLASS_MAP.get(x, x) for x in unique_cnames])
+    columns = ['unit_text', 'unit_index', 'SUPPORTS', 'REFUTES', 'NEI']
+    columns += [x for x in xfc.xfc_utils.ordered_set(it.chain(unique_cnames, ret_df.columns)) if x not in columns]
     ret_df = ret_df[columns]
+    mpath = 'model_params__model_path'
+    if mpath not in ret_df.columns:
+        ret_df[mpath] = np.NaN
+    ret_df[mpath].replace('nan', np.NaN, inplace=True)  # todo check remove
+    if ret_df[mpath].isna().any():
+        na_mask = ret_df[mpath].isna()
+        ret_df.loc[na_mask, mpath] = './' + ret_df.loc[na_mask, 'model_name'].astype(str)
     return ret_df.apply(pd.to_numeric, errors='ignore')
 
 
@@ -107,10 +126,12 @@ def explanation_to_dict_olap(exp, prm_dict=None):
         get_method = lambda x: getattr(exp, x) if hasattr(exp, x) else None
     assert get_method('record') is None or get_method('record').get('noisetag') is None or len(
         get_method('record')['noisetag']) == len(get_method('local_exp')[0])
+    assert (get_method('record') is None or get_method('record').get('goldtag') is None or
+            len(get_method('record')['goldtag']) == len(get_method('local_exp')[0]))
     ret_list = []
     out_dict = {}
     # get available attributes of exp
-    for key in [ 'label', 'execution_time', 'id']:
+    for key in ['label', 'execution_time', 'id']:
         out_dict[key] = get_method(key)
     if params_to_report := get_method('params_to_report'):
         out_dict |= params_to_report
@@ -119,13 +140,14 @@ def explanation_to_dict_olap(exp, prm_dict=None):
         out_dict['label'] = get_method('record')['label']
     class_names = get_method('class_names')
     if class_names is None:
-        if prm_dict is not None:
-            class_names = prm_dict['explainer_params__class_names']
-        else:
-            class_names = xfc.xfc_utils.class_names_load
+        class_names = prm_dict.get('explainer_params__class_names', None)
+        if class_names is None:
+            class_names = xfc.experiment_definitions.E.CLASS_NAMES_V1
+    class_names = [xfc.C.CLASS_MAP.get(x, x) for x in class_names]
     # save predict_proba of each class
+    predict_proba = get_method('predict_proba')
     for i, tclass in enumerate(class_names):
-        out_dict[tclass + '_predict_proba'] = get_method('predict_proba')[i]
+        out_dict[tclass + '_predict_proba'] = predict_proba[i]
 
     # create a dictionary exp_by_unit which has as key the index of unit explained and as value a dictionary with the impacts on each class
     local_exp = get_method('local_exp')
@@ -149,7 +171,11 @@ def explanation_to_dict_olap(exp, prm_dict=None):
         noisetag = get_method('record').get('noisetag', None)
         if noisetag is not None:
             for i in range(len(ret_list)):
-                ret_list[i]['noisetag'] = noisetag[i]
+                ret_list[i]['goldtag'] = 1 - noisetag[i]
+        goldtag = get_method('record').get('goldtag', None)
+        if goldtag is not None:
+            for i in range(len(ret_list)):
+                ret_list[i]['goldtag'] = goldtag[i]
 
     # Adding the claim in unit_text and intercept in the impact
     claim_text = get_method('claim')
@@ -163,21 +189,21 @@ def explanation_to_dict_olap(exp, prm_dict=None):
     return ret_list
 
 
-def load_explanations_lime_to_df(dir='/homes/bussotti/feverous_work/feverousdata/AB/'):
+def load_explanations_lime_to_df(path='/homes/bussotti/feverous_work/feverousdata/AB/'):
     """
     Load the explanations from the lime_explanations folder and create a pandas dataframe
     """
-    files_dict = load_explanations_lime(dir=dir)
+    files_dict = load_explanations_lime(path=path)
     return explanations_to_df_lime(files_dict)
 
 
-def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/AB/'):
+def load_only_claim_predictions(path='/homes/bussotti/feverous_work/feverousdata/AB/'):
     """
     Load the predictions of the only_claim model and create a pandas dataframe
 
     Parameters
     ----------
-    dir : str
+    path : str
         The directory where the predictions are stored
 
     Returns
@@ -186,11 +212,11 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
         A pandas dataframe with the predictions of the only_claim model
 
     """
-    files = [x for x in os.listdir(dir) if x.endswith('only_claim.json')]
+    files = [x for x in os.listdir(path) if x.endswith('only_claim.json')]
     # load the files
     predictions_dict = {}
     for file in files:
-        with open(os.path.join(dir, file), 'r') as f:
+        with open(os.path.join(path, file), 'r') as f:
             predictions_dict[file] = json.load(f)
     # convert the file in dataframe
     out_list = []
@@ -213,9 +239,20 @@ def load_only_claim_predictions(dir='/homes/bussotti/feverous_work/feverousdata/
 def load_experiment_result_by_code(experiment_code, results_path) -> list:
     """
     Load the results of the experiments given the experiment code
-    :param experiment_code: experiment codes
-    :param results_path: path to the dataset results
-    :return: a pandas dataframe with the results
+
+    Parameters
+    ----------
+    experiment_code : str
+        experiment codes
+    results_path : str
+        path to the dataset results
+
+    Returns
+    -------
+    list
+        a list of results containing in each item a pair of params and the results
+
+
     """
     full_experiment_path = os.path.join(results_path, experiment_code)
     # scan the directory. In each subfolder there is a json file with the params and a pkl file with the results
@@ -238,29 +275,28 @@ def load_experiment_result_by_code(experiment_code, results_path) -> list:
     return results_list
 
 
-def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list=None, save_name=None):
+def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list=None, save_name=None,
+                                 results_path=None):
+    if results_path is None:
+        results_path = xfc.experiment_definitions.E.RESULTS_DIR
     if only_claim_exp_list is None:
         only_claim_exp_list = []
     exp_object_list = []
     for experiment_code in experiment_code_list:
-        x = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
+        x = load_experiment_result_by_code(experiment_code, results_path=results_path)
         exp_object_list += x
     explanation_df = explanations_to_df(exp_object_list)
-    id_cols = ['dataset_file_name', 'id', 'model_path']
-
-    if 'model_path' not in explanation_df.columns:
-        explanation_df['model_path'] = np.NaN
-    explanation_df['model_path'].replace('nan', np.NaN, inplace=True)  # todo check remove
-    if explanation_df['model_path'].isna().any():
-        na_mask = explanation_df['model_path'].isna()
-        explanation_df.loc[na_mask, 'model_path'] = './' + explanation_df.loc[na_mask, 'model_name'].astype(str)
-    class_pred_cols = [x + '_predict_proba' for x in xfc.xfc_utils.class_names_load]
+    mpath = 'model_params__model_path'
+    id_cols = ['dataset_file_name', 'id', mpath]
+    unique_cnames = set(it.chain.from_iterable(explanation_df['explainer_params__class_names'].values))
+    unique_cnames = set([xfc.C.CLASS_MAP.get(x, x) for x in unique_cnames])
+    class_pred_cols = [x + '_predict_proba' for x in unique_cnames]
     index_exp = explanation_df[id_cols]
 
     if only_claim_exp_list:
         only_claim_list = []
         for experiment_code in only_claim_exp_list:
-            only_claim = load_experiment_result_by_code(experiment_code, xfc.experiment_definitions.C.RESULTS_DIR)
+            only_claim = load_experiment_result_by_code(experiment_code, results_path=results_path)
             only_claim_list += only_claim
 
         only_claim_predictions_df = explanations_to_df(only_claim_list)
@@ -282,28 +318,30 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
     all_df.sort_values(by=id_cols, inplace=True)
 
     all_df['predicted_label'] = all_df[class_pred_cols].idxmax(axis=1).str.replace('_predict_proba', '')
+    all_df['predicted_label_int'] = all_df.apply(
+        lambda xin: xin['explainer_params__class_names'].index(xin['predicted_label']), axis=1)
     for tclass in xfc.xfc_utils.class_names_load:
         tmask = all_df['predicted_label'] == tclass
         all_df.loc[tmask, 'score_on_predicted_label'] = all_df.loc[tmask, tclass]
 
     # take last part of model_path as model_name
-    all_df['model_id'] = all_df['model_path'].apply(lambda x: x.split('/')[-1])
+    all_df['model_id'] = all_df[mpath].apply(lambda xin: xin.split('/')[-1])
     # save the explanations to a csv file
     # correction of label. Load dataset files by adding '_orig.jsonl' and replace the label with the one in the original file
     # load the original dataset files
     for dataset_file_name in all_df['dataset_file_name'].unique():
         dataset_file_name_orig = dataset_file_name.replace('.jsonl', '_orig.jsonl')
-        tpath = os.path.join(xfc.experiment_definitions.C.DATASET_DIR_FEVEROUS[0], dataset_file_name_orig)
+        tpath = os.path.join(xfc.experiment_definitions.E.BASE_V1[0], dataset_file_name_orig)
         if not os.path.exists(tpath):
             continue
         with open(tpath, 'r') as f:
             orig_records = [json.loads(x) for x in f]
         orig_records_dict = {x['id']: x for x in orig_records}
         mask = all_df['dataset_file_name'] == dataset_file_name
-        all_df.loc[mask, 'label'] = all_df.loc[mask, 'id'].apply(lambda x: orig_records_dict[x]['label'])
+        all_df.loc[mask, 'label'] = all_df.loc[mask, 'id'].apply(lambda xin: orig_records_dict[xin]['label'])
 
     if save_name:
-        all_df.to_csv(os.path.join(xfc.experiment_definitions.C.RESULTS_DIR, save_name), index=False)
+        all_df.to_csv(os.path.join(results_path, save_name), index=False)
 
     # assert (pd.Series(only_claim_predictions_df[id_cols].astype(str).apply('_'.join, 1).unique()).isin(explanation_df[
     #                                                                                                        id_cols].astype(
@@ -320,17 +358,88 @@ def load_preprocess_explanations(experiment_code_list: list, only_claim_exp_list
     return all_df
 
 
+swapped_experiments = ['fv_f2l_1.0', 'fv_f2l_2.0', 'fv_f3l_1.0', 'fv_f3l_2.0', 'fv_f2lF_1.0', 'fv_f2lF_2.0',
+                       'fv_f3lF_1.0', 'fv_f3lF_2.0', 'fv_sf_1.0', 'fv_sf_2.0', 'fv_fm_1.0', 'fv_fm_2.0', 'fv_av_1.0',
+                       'fv_av_2.0', 'r2_fv_f2l_1.0', 'r2_fv_f2l_2.0', 'r2_fv_f3l_1.0', 'r2_fv_f3l_2.0',
+                       'r2_fv_f2lF_1.0', 'r2_fv_f2lF_2.0', 'r2_fv_f3lF_1.0', 'r2_fv_f3lF_2.0', 'r2_fv_sf_1.0',
+                       'r2_fv_sf_2.0', 'r2_fv_fm_1.0', 'r2_fv_fm_2.0',
+                       ]
+
 if __name__ == '__main__':
     df = load_preprocess_explanations(experiment_code_list=[
-        'fv_f2l_1.0',
-        'fv_fm_1.0',
-        'fv_fm_2.0',
-        'fv_sf_1.0',
-        'fv_sf_2.0',
-        'fv_f3l_1.0',
-        'fv_f2l_2.0',
-        'fv_f3l_2.0',
+        # 'fv_sf_1.0', # old
+        # 'fv_sf_2.0', # old
+        'r2_fv_sf_1.0',
+        'r2_fv_sf_2.0',
+
+        'fv_f2lF_1.0',
+        'fv_f2lF_2.0',
+        'fv_f3lF_1.0',
+        'fv_f3lF_2.0',
+
+        # 'r2_fv_f2lF_1.0', # no noise
+        # 'r2_fv_f2lF_2.0', # no noise
+        # 'r2_fv_f3lF_1.0', # no noise
+        # 'r2_fv_f3lF_2.0', # no noise
+
+        # 'fv_fm_1.0', # v1
+        # 'fv_fm_2.0', # v1
+        'r2_fv_fm_1.0',
+        'r2_fv_fm_2.0',
+
+        'fv_av_1.0',
+        'fv_av_2.0',
+
+        # 'r2_fv_f2l_1.0', #f2l small
+        # 'r2_fv_f2l_2.0', #f2l small
+        # 'r2_fv_f3l_1.0', #f2l small
+        # 'r2_fv_f3l_2.0', #f2l small
+        # 'fv_f2l_1.0', #f2l small
+        # 'fv_f2l_2.0', #f2l small
+        # 'fv_f3l_1.0', #f2l small
+        # 'fv_f3l_2.0', #f2l small
+        # 'gfce_f2l_1.0', #f2l small
+        # 'gfce_f2l_2.0', #f2l small
+
+        # 'gfce_f3l_1.0',  # OK 4:27h # v1 remove
+        # 'gfce_fm2_1.0',  # OK 4:29h # v1
+        # 'gfce_sf_1.0',  # OK 1:10h # v1 remove
+        # 'gfce_f3l_1.1',  # 4:49h # xs num_samples
+        'gfce_sf_2.1',  # 5:34h
+        'gfce_sf_1.1',  # 1:10h # xs num_samples
+        'gfce_f3l_2.1',  # 22:52h
+        # 'gfce_f3l_2.0',  # 22:25h # v1 remove
+        'gfce_f3l_1.1F',  # 12:17h
+        'gfce_sf_1.1F',  # 3:09h
+        'gfce_av_1.0F',  # 8:00h
+        'gfce_av_2.0',  # 13:55h
+        # 'gfce_fm2_1.1',  # 22:28h
+        # 'gfce_fm2_2.1',  # 15:39h
+        # 'gfce_f2l_1.1',  # 12:31h # small f2l
+        # 'gfce_f2l_2.1',  # 29:51h # small f2l
+        'gfce_f2l_1.1F',  # 12:24h
+        'gfce_f2l_2.1F',  # 23:08h
+        'gfce_fm2_2.2',
+        'gfce_fm2_1.2',
+
+        # 'llama70b_f2l_1.0',  # 10:43h
+
+        'llama70b_f2l_2.1',  # 14:58h
+        'llama70b_fm2_1.0',  # 18:40h
+        'llama70b_fm2_2.0',
+        'llama70b_sf_1.0',
+        'llama70b_sf_2.0',
+        'llama70b_av_1.0',
+        'llama70b_av_2.0',
+        'llama70b_f3l_1.0',
+        'llama70b_f3l_2.0',  # 17:45h
+        'llama70b_f2l_1.1',  # 8:17h
     ], save_name='all_exp_v1.csv')
+    model_name_map = {'Roberta_v2': 'Roberta',
+                      'GenFCExp_v2': 'GenFCExp'}
+    df['model_name'] = df['model_name'].replace(model_name_map)
+    df.to_csv(os.path.join(xfc.experiment_definitions.E.RESULTS_DIR, 'all_exp_v2.csv'), index=False)
+
     df = load_preprocess_explanations(experiment_code_list=[
         'fbs_np_1.0',
         'fbs_np_2.0',
