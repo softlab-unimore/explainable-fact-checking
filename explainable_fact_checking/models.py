@@ -65,5 +65,15 @@ model_factory.register_creator('LLAMA3_1', LLama3_1Adapter)
 model_factory.register_creator('fake_predictor', FakePredictor)
 
 model_factory.register_creator('Roberta', RobertaWrapper)
+model_factory.register_creator('Roberta_v2', RobertaWrapper)
+model_factory.register_creator('Roberta_v2_no_noise', RobertaWrapper)
+model_factory.register_creator('Roberta_bad', RobertaWrapper)
 
 model_factory.register_creator('GenFCExp', GenFCExp)
+model_factory.register_creator('GenFCExp_v2', GenFCExp)
+
+
+from explainable_fact_checking.model_adapters.llama import LLAMA31Wrapper
+model_factory.register_creator('LLAMA31_8B', LLAMA31Wrapper)
+model_factory.register_creator('LLAMA31_70B', LLAMA31Wrapper)
+
