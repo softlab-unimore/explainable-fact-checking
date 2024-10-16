@@ -1,9 +1,9 @@
-
 import sys, os, random
 from sklearn.metrics import roc_curve
 import numpy as np
 import copy
 import json
+import itertools as it
 
 import explainable_fact_checking.experiment_definitions
 
@@ -15,11 +15,10 @@ if path not in sys.path:
 sys.path.insert(0, "/homes/bussotti/feverous_work/feverousdata/feverous/")
 import explainable_fact_checking as xfc
 
-save_path = xfc.experiment_definitions.C.PLOT_DIR
+save_path = xfc.experiment_definitions.E.PLOT_DIR
 
 for extension in ['pdf', 'html', 'svg']:
     os.makedirs(os.path.join(save_path, extension), exist_ok=True)
-
 
 import pandas as pd
 import os
@@ -33,6 +32,7 @@ if 'google.colab' in sys.modules:
     pio.renderers.default = 'colab'
 import plotly.graph_objs as go
 
+random_seed = 42
 ratio = .9
 pixel_width = 600
 pixel_height = pixel_width / ratio
@@ -81,7 +81,7 @@ h_legend_dict = dict(legend=dict(
     xanchor="right",
     x=1
 ))
-pio.templates.default = "matplotlib"
+# pio.templates.default = "matplotlib"
 
 pio.kaleido.scope.chromium_args = tuple([
     arg for arg in pio.kaleido.scope.chromium_args if arg != "--disable-dev-shm-usage"
@@ -99,19 +99,25 @@ def save_fig(fig, name, save_path=save_path):
 
 title_off = True
 columns_order_map = {
-    'type': {'evidence': 0, 'claim_intercept': 1, 'only_claim': 2},
+    'type': {'evidence': 0, 'noise': 1, 'claim_intercept': 2, 'only_claim': 3},
     'y': {'ground_truth': 0, 'predicted_label': 1},
-    'model_id': {model_id: i for i, model_id in enumerate(['feverous_verdict_predictor', 'models_fromjf270623or'])},
+    # 'model_name': {model_id: i for i, model_id in enumerate(['feverous_verdict_predictor', 'models_fromjf270623or'])},
     'explainer_name': {explainer_name: i for i, explainer_name in enumerate(['claim_only_pred', 'lime', 'shap', ])},
-    'predicted_label': {class_: i for i, class_ in enumerate(
-        explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0)},
-    'class': {class_: i for i, class_ in enumerate(explainable_fact_checking.experiment_definitions.CLASS_NAMES_V0)},
-
+    'predicted_label': {class_: i for i, class_ in enumerate(('SUPPORTS', 'NEI','REFUTES'))},
+    'class': {class_: i for i, class_ in enumerate(explainable_fact_checking.experiment_definitions.E.CLASS_NAMES_V1)},
+    'model_name': {model_id: i for i, model_id in enumerate(['Roberta', 'GenFCExp', 'LLAMA31_70B'])},
+    'dataset_name': {dataset_name: i for i, dataset_name in
+                     enumerate(['feverous2l_full', 'feverous3l_full', 'SciFact', 'AVERITEC', 'FM2', ])}
 }
 
 
 def sort_df(df, columns):
-    to_sort = tuple(df[col].map(columns_order_map.get(col, sorted(df[col].unique()))) for col in columns)
+    to_sort = []
+    for col in columns:
+        if col in columns_order_map:
+            to_sort.append(df[col].map(columns_order_map[col]))
+        else:
+            to_sort.append(df[col].map({val: i for i, val in enumerate(sorted(df[col].unique()))}))
     return df.iloc[np.lexsort(to_sort)]
 
 
@@ -125,7 +131,8 @@ def end_fig_func(fig):
                                           )
                        )
     for idx in range(len(fig.data)):
-        fig.data[idx].x = [xfc.charts.style.replace_words(t) if isinstance(t, str) else t for t in fig.data[idx].x if t is not None]
+        fig.data[idx].x = [xfc.charts.style.replace_words(t) if isinstance(t, str) else t for t in fig.data[idx].x if
+                           t is not None]
 
     # increase space between yticks and y title
 
