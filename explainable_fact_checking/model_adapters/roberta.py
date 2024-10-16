@@ -1,5 +1,6 @@
 import gc
-
+import json
+import itertools as it
 import numpy as np
 import torch
 from transformers import AutoTokenizer, RobertaForSequenceClassification
@@ -27,7 +28,7 @@ class RobertaWrapper():
         self.random_seed = random_seed
         self.batch_size = batch_size
 
-    def predict(self, input):
+    def predict(self, record_list : list):
         # dataset_dict = dataset_dict.map(preprocess_function, batched=True)
         # input_pre = self.tokenizer(input["text"], truncation=False, padding='max_length', max_length=512)
         # dataset_dict = input
@@ -57,8 +58,8 @@ class RobertaWrapper():
         #     outputs = self.model(**inputs).logits  # Get the model's output logits
         # y_prob = torch.sigmoid(outputs).tolist()[0]  # Apply sigmoid activation and convert to list
         txt_list = []
-        for elt in input:
-            claim_and_ev = ' </s> '.join([elt['claim']] + elt['evidence'])
+        for elt in record_list:
+            claim_and_ev = '</s>'.join([elt['claim']] + elt['evidence'])
             txt_list += [claim_and_ev]
         out_list = []
         for batch in range(0, len(txt_list), self.batch_size):
@@ -76,12 +77,36 @@ class RobertaWrapper():
                 out_list += torch.sigmoid(outputs.logits.clone()).tolist()
             del outputs
             del inputs
-
+        gc.collect()
+        torch.cuda.empty_cache()
         # with torch.no_grad():
         #     outputs = self.model(**inputs)
         # y_prob = torch.sigmoid(outputs.logits).tolist()
-        y_prob = out_list
-        return np.round(y_prob, 5) # Round the predicted probability to 5 decimal places
+        if self.model.num_labels == 3:
+            universal_to_feverous = {1: 0, 2: 1, 0: 2}
+            feverous_to_universal = {0: 1, 1: 2, 2: 0}
+
+        elif self.model.num_labels == 2:
+            universal_to_feverous = {i: i for i in range(7)}
+            feverous_to_universal = {i: i for i in range(7)}
+        else:
+            universal_to_feverous = {1: 0, 2: 1, 0: 2} | {i: i for i in range(3, 7)}
+            feverous_to_universal = {0: 1, 1: 2, 2: 0} | {i: i for i in range(3, 7)}
+
+        y_prob = np.round(out_list, 5)  # Round the predicted probability to 5 decimal places
+        order = [universal_to_feverous[i] for i in range(y_prob.shape[1])]
+        y_prob = y_prob[:,order]
+        # debug script
+        # y_prob = np.round(out_list, 5)  # Round the predicted probability to 5 decimal places
+        # y_true = np.array([x['label'] for x in record_list])
+        # order_permutation = list(it.permutations(range(self.model.num_labels)))
+        # acc_dict = {}
+        # for order in order_permutation:
+        #     y_pred_int_v2 = np.argmax(y_prob[:, order], axis=1)
+        #     acc = np.mean(y_true == y_pred_int_v2)
+        #     acc_dict[order] = acc
+        return y_prob
+
 
     def __call__(self, *args, **kwargs):
         return self.predict(*args, **kwargs)
